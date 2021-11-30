@@ -1,0 +1,13 @@
+skiplist/.metals
+skiplist/.vscode
+skiplist/.stainless-cache
+.metals/*
+project/*
+target/*
+settings.json
+sbt.json
+.metals/
+.vscode/
+.bsp/
+target/
+project/
