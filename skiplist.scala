@@ -148,11 +148,10 @@ object SkipList {
         level_insert(t, k, v, height)
       }
       case _ => t
-        
-        
     }
-
-    new SkipList(insert(sl.head, k, v, height),sl.max_height) //TODO:+1 ?
+    val new_tree = insert(sl.head, k, v, height)
+    val new_height = max(min(height,sl.max_height+1),sl.max_height)
+    new SkipList(new_tree,new_height) //TODO:+1 ?
   }
 
 }
