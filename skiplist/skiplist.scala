@@ -54,64 +54,82 @@ object SkipList {
 
   def insert(sl: SkipList[K,V], k: K, v: V, height: int): SkipList[K,V] = {
 
+
+    def search_right(t: Tree[K,V], target: K): Tree[K,V] = t match {
+      case SkipNode(k,v,down,right,current_level) =>
+        if (k == target){t}
+        else search_right(right,target)
+      case Tail => Tail
+    }
     // operating on level l
     def level_insert(t: Tree[K,V], target: K, value: V, target_height:int): Tree[K,V] = t match {
       
-      case SkipNode(k,v,down,right,current_level) =>
-        right match {
-          case SkipNode(k1,_,_,_,_) =>
-            if(k1 < target){
-              level_insert(right, target, value, l)
-            }
+      case SkipNode(k,v,down,right,current_level) => {
+            if(right.isInstanceOf(SkipNode) and right.k<target){
+              level_insert(right, target, value, target_height)
+            } 
             else{ // t is pred of target at level l
               if(current_level > height) {
                 level_insert(down, target, value, target_height)
               }
-              if(h=0) TODO stitch(pred, left, right)
-              else (h>0)
+              if(current_level == 0){
+                val newNode = SkipNode(target, value, Bottom(), right, current_level)
+                SkipNode(k,v,down,newNode,current_level)
+              }
+              else (current_level > 0){
                 val new_down = level_insert(down, target, value, target_height)
+
+                val lower_new_node = search_right(new_down,target)
+                val newNode = SkipNode(target, value, lower_new_node, right, current_level)
+
                 SkipNode(k, v, new_down, right, current_level)
+
               }
               
             }
-          case Tail => TODO
-        }
-
+          }
     }
 
+    def insert_first(h: Tree[K,V], t: Tree[K,V], k: K, v: V, height: int): Tree[K,V] = t match {
+      if(t.height == 0){
+        SkipNode(k, v, Bottom(), t, current_level)
+      }
+      else {
+        val lower_first = insert_first(h: Tree[K,V], t: Tree[K,V], k: K, v: V, height: int)
+        SkipNode(k, v, Bottom(), t, current_level)
+
+      }
+    }
     def  insert(t: Tree[K,V], k: K, v: V, height: int): Tree[K,V] = {
 
       // if new level, raise first element to this new level
+
+      if(k<t.key){
+        val max_height = t.height
+        SkipNode(k, v, new_down, right, current_level)
+
+      }
       if(height > t.height) {
         val higher_t = SkipNode(t.k, t.v, t, Tail(), t.height+1)
-        insert(higher_t, k, v, t.height + 1 )
-      }
-      else {
-        val level_pred =  
+        insert(higher_t, k, v, t.height + 1)
       }
 
     
 
     }
 
-    val first_value = sl.h.succ.k
-    if( first_value > k) {
-    
-    }
-    else {
-      insert(sl.t, k, v, height)
-    } 
-
+    insert(sl.t, k, v, height)
   }
+    //val first_value = sl.h.succ.k
+    //if( first_value > k) {
+ 
+    //else {
+    //  insert(sl.t, k, v, height)
+    //} 
+
 
     
 
-
-
-
-
-  }
-
-  def remove() = {}
+  //def remove() = {}
 
 }
