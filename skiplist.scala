@@ -1,14 +1,12 @@
 import math.{max, min}
 import scala.util.Random
 
-object SkipList {  
+object SkipList {
   sealed abstract class Node
   case class SkipList(head: Node, max_height: Int)
   case class SkipNode(value: Int, down: Node, right: Node, height: Int) extends Node
   case object Leaf extends Node
   
-  // TODO : Try out implementation with one node per element
-
   // TODO : Write invariants and make Stainless prove them
   // Invariants : If insert element then search, found
   // If search element in the list, it is found
@@ -119,7 +117,7 @@ object SkipList {
           case Leaf => SkipNode(value, newDown, Leaf, height) // Reached end of this level, just update lower node
         }
       }
-      case Leaf => throw new IllegalArgumentException("removeRight should not be called on a Leaf")
+      case Leaf => Leaf
     }
 
     SkipList(remove_(sl.head, k), sl.max_height)
