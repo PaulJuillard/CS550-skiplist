@@ -7,7 +7,6 @@ object SkipList {
   case object Leaf extends Node
   
   // TODO : Make sure first element is always -inf, and last element is always +inf (or make Stainless assume, TBD later)
-  // TODO : Add an insert method without height, and determine height randomly, then call current method
   // TODO : Tests
 
   // TODO : Write invariants and make Stainless prove them
@@ -97,10 +96,48 @@ object SkipList {
     SkipList(remove_(sl.head, k), sl.max_height)
   }
 
-}
+  def insert(sl: SkipList, k: Int): SkipList = {
+    // Generate random level
+    def getRandomLevel(rd: scala.util.Random, acc: Int): Int = {if (rd.nextInt(2) == 0) {acc} else {getRandomLevel(rd, acc+1)}}
+    val r = new scala.util.Random
+    val height = getRandomLevel(r, 0)
+    insert(sl, k, height)
+  }
 
-object HelloWorld {
+  def printList(sl: SkipList): Unit = {
+    def printLevel(t: Node): Unit = t match {
+      case Leaf => println("+inf")
+      case SkipNode(value, down, right, height) => print(value + ", ")
+    }
+    def printList_(t: Node): Unit = t match {
+      case Leaf => println()
+      case SkipNode(value, down, right, height) => {printLevel(t); printList_(down)}
+    }
+    printList_(sl.head)
+  }
+
+  def isIn(sl: SkipList, k: Int): Boolean = {
+    search(sl, k) match {
+      case None => false
+      case Some(value) => true
+    }
+  }
+
+  def randomAction(sl: SkipList): SkipList = {
+    // TODO
+    // Select random element
+    // Choose among insert/remove/search
+    // Do action
+    // Print result list
+    // Return result list
+    return null
+  }
+
   def main(args: Array[String]): Unit = {
-    println("Hello, world!")
+    val nOps = 50
+    println("test")
+    // TODO
+    // Init skiplist
+    // foreach on range of size nOps : print random action
   }
 }
