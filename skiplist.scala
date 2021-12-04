@@ -1,8 +1,8 @@
-import stainless.math.{max, min}
+import stainless.math.{max, min, wrapping}
 import stainless.lang._
 import stainless.annotation._
 import stainless.collection._
-
+import stainless.collection._
 
 object SkipList {
   sealed abstract class Node
@@ -10,31 +10,36 @@ object SkipList {
   case class SkipNode(value: Int, down: Node, right: Node, height: Int) extends Node
   case object Leaf extends Node
   
-  // def search(sl: SkipList, target: Int): Option[Int] = {
-  //   def search_(t: Node, target: Int): Option[Int] = t match {
-  //     case SkipNode(v,d,r,_) =>
-  //         if (v == target) { 
-  //           Some(v) 
-  //         }
-  //         else {
-  //           r match {
-  //             case SkipNode(vR,_,_,_) => 
-  //               if (vR <= target) { // If value is somewhere to the right, go right
-  //                 search_(r, target)
-  //               }
-  //               else { // If not, try down
-  //                 search_(d, target)
-  //               }
-  //             case Leaf => search_(d, target) // Reached the end of this level, go down
-  //           }
-  //         }
-  //     case Leaf => None()
-  
-  //   }
-  //   search_(sl.head, target)
-  // }
+ /*
+ def search(sl: SkipList, target: Int): Option[Int] = {
+   require(isSkipList(sl))
 
-  // def insert_h(sl: SkipList, k: Int, height: Int): SkipList = {
+   def search_(t: Node, target: Int): Option[Int] = {
+   decreases(subtree_size(t))
+   t match {
+     case SkipNode(v,d,r,_) =>
+         if (v == target) { 
+           Some(v) 
+         }
+         else {
+           r match {
+             case SkipNode(vR,_,_,_) => 
+               if (vR <= target) { // If value is somewhere to the right, go right
+                 search_(r, target)
+               }
+               else { // If not, try down
+                 search_(d, target)
+               }
+             case Leaf => search_(d, target) // Reached the end of this level, go down
+           }
+         }
+     case Leaf => None()
+   }  
+   }
+   search_(sl.head, target)
+ }
+*/
+  // /*def insert_h(sl: SkipList, k: Int, height: Int): SkipList = {
   //   require(height>=0)
   //   val newHeight = min(sl.max_height + 1, height) // TODO : Check that this makes sense
 
@@ -129,14 +134,15 @@ object SkipList {
   //   SkipList(remove_(sl.head, k), sl.max_height)
   // }
 
-  
-  // def isIn(sl: SkipList, k: Int): Boolean = {
-  //   search(sl, k) match {
-  //     case None() => false
-  //     case Some(value) => true
-  //   }
-  // }
-
+/*
+ def isIn(sl: SkipList, k: Int): Boolean = {
+   require(isSkipList(sl))
+   search(sl, k) match {
+     case None() => false
+     case Some(value) => true
+   }
+ }
+*/
 
   /* SkipList structural properties
   - max_Height >= heights >= 0
@@ -168,7 +174,7 @@ object SkipList {
   }
 
   def heightDecreasesDown(node : Node): Boolean = {
-    require(hasCorrectHeight(node))
+    require(hasCorrectHeight(node) && bottom_and_right_is_leaf(node))
     node match {
       case SkipNode(_,d,r,0) => d match {
         case Leaf => heightDecreasesDown(r)
@@ -179,15 +185,25 @@ object SkipList {
         case SkipNode(v2,_,_,h2) => (h1-1 == h2) && (v1 == v2) && heightDecreasesDown(d) && heightDecreasesDown(r)
       }
       case Leaf => true
-    }
-    true 
+    } 
   }
 
   def increasesToTheRight(t: Node): Boolean = t match {
     case SkipNode(value, down, right, height) => right match {
-      case SkipNode(valueR, downR, rightR, heightR) => value < valueR && increasesToTheRight(down) && increasesToTheRight(right)
+      case SkipNode(valueR, downR, rightR, heightR) => 
+        (
+        height == heightR && 
+        value < valueR &&
+        increasesToTheRight(down) &&
+        increasesToTheRight(right)
+        )
       case Leaf => true
     }
+    case Leaf => true
+  }
+
+  def bottom_and_right_is_leaf(t: Node): Boolean = t match {
+    case SkipNode(_,d,r,_) => bottom_and_right_is_leaf(r) && bottom_and_right_is_leaf(d)
     case Leaf => true
   }
 
@@ -198,10 +214,48 @@ object SkipList {
 
   def isSkipList(sl: SkipList): Boolean = {
     if (!headIsMinInt(sl)) {false}
-    else if (hasCorrectHeight(sl.head) && maxHeightIsMaxHeight(sl.max_height)(sl.head)) {
+    else if (hasCorrectHeight(sl.head) &&
+             maxHeightIsMaxHeight(sl.max_height)(sl.head) &&
+             bottom_and_right_is_leaf(sl.head) && increasesToTheRight(sl.head)) 
+    {
       heightDecreasesDown(sl.head)
     }
     else {false}
+  }
+
+  def height(n: Node): Int = n match {
+    case SkipNode(_,_,_,h) => h
+    case Leaf => -1
+  }
+
+  def east(n : Node): Int = {
+    require(bottom_and_right_is_leaf(n))
+    n match {
+      case SkipNode(_,_,r,_) => wrapping {1 + east(r)}
+      case Leaf => 0
+    }
+  }
+
+  def lem_right_east_less(n : SkipNode): Unit = {
+    require(bottom_and_right_is_leaf(n))
+    n.right match {
+      case x@SkipNode(_,d,r,h) => assert(east(n) == 1 + east(x))
+      case Leaf => assert(east(n) == 1)
+    }
+  }.ensuring(east(n.right) < east(n))
+
+  
+  def subtree_size(t: Node): Int = {
+    require(hasCorrectHeight(t) && heightDecreasesDown(t) && bottom_and_right_is_leaf(t) && increasesToTheRight(t))
+    decreases(height(t) + east(t))
+    t match {
+      case Leaf => 0
+      case x@SkipNode(value, down, right, h) => {
+        assert( height(right) == height(t))
+        lem_right_east_less(x)
+        1 + subtree_size(down) + subtree_size(right)
+      }
+    }
   }
   
   // Invariants : 
@@ -212,13 +266,23 @@ object SkipList {
   // Search is probabilistically log
   // Also first element is always -inf
 
-/*
+  
+  /*
   def inv_inserted_found(sl:SkipList, k: Int):Unit = {
     //TODO change hardcoded 0
   }.ensuring(_=> search(insert_h(sl, k, 0), k) == Some(k))
+  
+
+  def lem_search_is_k_or_none(sl:SkipList, k:Int): Unit = {
+    require(isSkipList(sl))
+  }.ensuring(_=> search(sl, k) == Some(k) || search(sl, k) == None())
 
   def inv_isin_search(sl: SkipList, k: Int): Unit = {
-    //can distinguish cases if needed
+    require(isSkipList(sl))
+
+    if(search(sl, k) == Some(k)) assert(isIn(sl, k))
+    else assert(search(sl, k) == None())
+
   }.ensuring(_=> isIn(sl, k) == (search(sl, k) == Some(k)))
 
   def inv_remove_notfound(sl:SkipList, k:Int) : Unit = {
