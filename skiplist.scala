@@ -1,4 +1,4 @@
-import stainless.math.{max, min}
+import stainless.math.{max, min, wrapping}
 import stainless.lang._
 import stainless.annotation._
 import stainless.collection._
@@ -249,6 +249,79 @@ object SkipList {
     }
     else {false}
   }
+
+  // def nodeHeight(n: Node): BigInt = n match {
+  //   case SkipNode(_,d,_,h) => if (h == 0) {0} else {nodeHeight(d)+1}
+  //   case Leaf => -1
+  // }
+
+  // def east(n : Node): BigInt = {
+  //   n match {
+  //     case SkipNode(_,_,r,_) => 1 + east(r)
+  //     case Leaf => 0
+  //   }
+  // }
+
+  // def lem_right_east_less(n : SkipNode): Unit = {
+  //   n.right match {
+  //     case x@SkipNode(_,d,r,h) => assert(east(n) == 1 + east(x))
+  //     case Leaf => assert(east(n) == 1)
+  //   }
+  // }.ensuring(east(n.right) < east(n))
+
+
+  // def subtree_size(t: Node): BigInt = {
+  //   require(hasNonNegativeHeight(t) && heightDecreasesDown(t) && increasesToTheRight(t))
+  //   decreases(nodeHeight(t) + east(t))
+  //   t match {
+  //     case Leaf => 0
+  //     case x@SkipNode(value, down, right, h) => {
+  //       assert(nodeHeight(right) == nodeHeight(t))
+  //       lem_right_east_less(x)
+  //       1 + subtree_size(down) + subtree_size(right)
+  //     }
+  //   }
+  // }
+  def bottom_and_right_is_leaf(t: Node): Boolean = t match {
+    case SkipNode(_,d,r,_) => bottom_and_right_is_leaf(r) && bottom_and_right_is_leaf(d)
+    case Leaf => true
+  }
+
+
+  def height(n: Node): Int = n match {
+    case SkipNode(_,_,_,h) => h
+    case Leaf => -1
+  }
+
+  def east(n : Node): Int = {
+    require(bottom_and_right_is_leaf(n))
+    n match {
+      case SkipNode(_,_,r,_) => wrapping {1 + east(r)}
+      case Leaf => 0
+    }
+  }
+
+  def lem_right_east_less(n : SkipNode): Unit = {
+    require(bottom_and_right_is_leaf(n))
+    n.right match {
+      case x@SkipNode(_,d,r,h) => assert(east(n) == 1 + east(x))
+      case Leaf => assert(east(n) == 1)
+    }
+  }.ensuring(east(n.right) < east(n))
+
+
+  def subtree_size(t: Node): Int = {
+    require(hasNonNegativeHeight(t) && heightDecreasesDown(t) && bottom_and_right_is_leaf(t) && increasesToTheRight(t))
+    decreases(height(t) + east(t))
+    t match {
+      case Leaf => 0
+      case x@SkipNode(value, down, right, h) => {
+        assert( height(right) == height(t))
+        lem_right_east_less(x)
+        1 + subtree_size(down) + subtree_size(right)
+      }
+    }
+  }
   //_________________________________________________INVARIANTS__________________________________________
   // Invariants : 
   // If sl is skiplist and insert element then result is also skiplist and search returns Some(x)
@@ -289,7 +362,7 @@ object SkipList {
   def sizeRightIsNonNegative(t: Node): Unit = {
     t match {
       case Leaf => ()
-      case SkipNode(value, down, right, height) => {sizeRightIsNonNegative(right)}
+      case SkipNode(value, down, right, height) => sizeRightIsNonNegative(right)
     }
   }.ensuring(_ => sizeRight(t) >= 0)
 
