@@ -334,12 +334,14 @@ object SkipList {
   }
   */
   //_________________________________________________________LEMMAS____________________________________________________
-  def elementOfSkipListIsSkipList(t: SkipNode): Unit = {
+  def elementOfSkipListIsSkipList(t: SkipNode): Unit = { // Is not used in proofs, but keep it there to make sure we don't break SkipList axioms
     require(isSkipList(t))
     assert(levelsAxiom(t.down))
     assert(levelsAxiom(t.right))
   } ensuring (_ => isSkipList(t.down) && isSkipList(t.right))
 
+
+  // Proof that size(right) decreases (TODO)
   def sizeRightIsNonNegative(t: Node): Unit = {
     t match {
       case Leaf => ()
@@ -362,19 +364,12 @@ object SkipList {
     sizeRightIsNonNegative(t.right)
   } ensuring (_ => size(t) > 0)
 
-  // def sizeOfRightIsLower(t: SkipNode) = { // TODO : Times out
-  //   require(isSkipList(t))
-  //   t.right match {
-  //     case Leaf => {
-  //       sizeSkipNodeIsPositive(t)
-  //       assert(size(t.right) == 0)
-  //     }
-  //     case SkipNode(value, down, right, height) => {
-  //       assert(1 + size(down) + sizeRight(right) > size(right))
-  //     }
-  //   }
-  // }.ensuring(_ => size(t) > size(t.right))
+  def sizeOfRightIsLower(t: SkipNode) = { // TODO : Times out
+    require(isSkipList(t))
+  }.ensuring(_ => size(t) > size(t.right))
 
+
+  // Proof of maxHeightIsMaxHeight for both nodes and skiplists
   def hasUpperBoundedHeight(maxHeight: Int, t: Node) = t match {
     case SkipNode(_, _, _, height) => height <= maxHeight
     case Leaf => true
@@ -420,9 +415,8 @@ object SkipList {
     }
   } ensuring (_ => maxHeightIsMaxHeight(sl.maxHeight, sl.head))
 
-  def isSkipNode(n: Node): Boolean = n match {case _ => true; case Leaf => false}
-  def isLeaf(n: Node): Boolean = !isSkipNode(n)
 
+  // Proof of isInRightSubTree transitivity
   def ifNodeHasDownAllRightNodesHaveDown(n: SkipNode, x: SkipNode): Unit = {
     require(isSkipList(n))
     require(isSkipList(x))
@@ -436,7 +430,7 @@ object SkipList {
     require(isInRightSubtree(x, n))
   } ensuring (_ => isSkipNode(n.right))
 
-  def rightIsAlsoInRightSubtree2(n: SkipNode, x: SkipNode): Unit = {
+  def rightIsAlsoInRightSubtree(n: SkipNode, x: SkipNode): Unit = {
     require(isSkipList(n))
     require(isSkipList(x))
     require(isInRightSubtree(x, n))
@@ -444,7 +438,7 @@ object SkipList {
       case Leaf => ()
       case r@SkipNode(value, down, right, height) => {
         if (r != x) {
-          rightIsAlsoInRightSubtree2(r, x)
+          rightIsAlsoInRightSubtree(r, x)
         } 
       }
     }
@@ -457,7 +451,7 @@ object SkipList {
     require(isInRightSubtree(n2, n1))
     require(isInRightSubtree(n3, n2))
     if (n3 != n2.right) {
-      rightIsAlsoInRightSubtree2(n1, n2)
+      rightIsAlsoInRightSubtree(n1, n2)
       n2.right match {
         case n2R@SkipNode(_, _, _, _) => {
           isInRightSubtreeTransitive(n1, n2R, n3)
@@ -465,15 +459,22 @@ object SkipList {
       }
     }
     else {
-      rightIsAlsoInRightSubtree2(n1, n2)
+      rightIsAlsoInRightSubtree(n1, n2)
     }
   } ensuring (_ => isInRightSubtree(n3, n1))
 
-  def levelsLemma(n: SkipNode, x: SkipNode): Unit = { // TODO : Times out
+
+  // Proof of the levels lemma (TODO)
+  def levelsLemma(n: SkipNode, x: SkipNode): Unit = {
     require(isSkipList(n))
     require(isSkipList(x))
     require(isInRightSubtree(x, n))
   } ensuring (_ => isInRightSubtree(x.down, n.down))
+
+
+  // Auxiliary functions
+  def isSkipNode(n: Node): Boolean = n match {case _ => true; case Leaf => false}
+  def isLeaf(n: Node): Boolean = !isSkipNode(n)
 
 
   //_________________________________________________________TESTING___________________________________________________
