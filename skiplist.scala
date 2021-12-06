@@ -436,10 +436,18 @@ object SkipList {
     require(isInRightSubtree(x, n))
   } ensuring (_ => isSkipNode(n.right))
 
-  def rightIsAlsoInRightSubtree(n: SkipNode, x: SkipNode): Unit = { // TODO : Times out
+  def rightIsAlsoInRightSubtree2(n: SkipNode, x: SkipNode): Unit = {
     require(isSkipList(n))
     require(isSkipList(x))
     require(isInRightSubtree(x, n))
+    n.right match {
+      case Leaf => ()
+      case r@SkipNode(value, down, right, height) => {
+        if (r != x) {
+          rightIsAlsoInRightSubtree2(r, x)
+        } 
+      }
+    }
   } ensuring (_ => isInRightSubtree(x.right, n))
 
   def isInRightSubtreeTransitive(n1: SkipNode, n2: SkipNode, n3: SkipNode): Unit = {
@@ -448,13 +456,16 @@ object SkipList {
     require(isSkipList(n3))
     require(isInRightSubtree(n2, n1))
     require(isInRightSubtree(n3, n2))
-    assert((n2 == n3) || isInRightSubtree(n3, n2.right)) // TODO : Times out
-    if (n3 != n2) {
-      rightIsAlsoInRightSubtree(n1, n2)
+    if (n3 != n2.right) {
+      rightIsAlsoInRightSubtree2(n1, n2)
       n2.right match {
-        case n2R@SkipNode(_, _, _, _) => isInRightSubtreeTransitive(n1, n2R, n3)
-        case Leaf => ()
+        case n2R@SkipNode(_, _, _, _) => {
+          isInRightSubtreeTransitive(n1, n2R, n3)
+        }
       }
+    }
+    else {
+      rightIsAlsoInRightSubtree2(n1, n2)
     }
   } ensuring (_ => isInRightSubtree(n3, n1))
 
