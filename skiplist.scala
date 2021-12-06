@@ -1,47 +1,42 @@
-import stainless.math.{max, min, wrapping}
+import stainless.math.{max, min}
 import stainless.lang._
 import stainless.annotation._
 import stainless.collection._
-import stainless.collection._
+
 
 object SkipList {
   sealed abstract class Node
-  case class SkipList(head: Node, max_height: Int)
+  case class SkipList(head: Node, maxHeight: Int)
   case class SkipNode(value: Int, down: Node, right: Node, height: Int) extends Node
   case object Leaf extends Node
   
- /*
- def search(sl: SkipList, target: Int): Option[Int] = {
-   require(isSkipList(sl))
+  // def search(sl: SkipList, target: Int): Option[Int] = {
+  //   def search_(t: Node, target: Int): Option[Int] = t match {
+  //     case SkipNode(v,d,r,_) =>
+  //         if (v == target) { 
+  //           Some(v) 
+  //         }
+  //         else {
+  //           r match {
+  //             case SkipNode(vR,_,_,_) => 
+  //               if (vR <= target) { // If value is somewhere to the right, go right
+  //                 search_(r, target)
+  //               }
+  //               else { // If not, try down
+  //                 search_(d, target)
+  //               }
+  //             case Leaf => search_(d, target) // Reached the end of this level, go down
+  //           }
+  //         }
+  //     case Leaf => None()
+  
+  //   }
+  //   search_(sl.head, target)
+  // }
 
-   def search_(t: Node, target: Int): Option[Int] = {
-   decreases(subtree_size(t))
-   t match {
-     case SkipNode(v,d,r,_) =>
-         if (v == target) { 
-           Some(v) 
-         }
-         else {
-           r match {
-             case SkipNode(vR,_,_,_) => 
-               if (vR <= target) { // If value is somewhere to the right, go right
-                 search_(r, target)
-               }
-               else { // If not, try down
-                 search_(d, target)
-               }
-             case Leaf => search_(d, target) // Reached the end of this level, go down
-           }
-         }
-     case Leaf => None()
-   }  
-   }
-   search_(sl.head, target)
- }
-*/
-  // /*def insert_h(sl: SkipList, k: Int, height: Int): SkipList = {
+  // def insert(sl: SkipList, k: Int, height: Int): SkipList = {
   //   require(height>=0)
-  //   val newHeight = min(sl.max_height + 1, height) // TODO : Check that this makes sense
+  //   val newHeight = min(sl.maxHeight + 1, height) // TODO : Check that this makes sense
 
   //   def insert_(t: Node, k: Int, insertHeight: Int): Node = t match { // Returns the list with k inserted
   //     case SkipNode(value, down, right, height) => {
@@ -96,7 +91,18 @@ object SkipList {
   //     }
   //   }
 
-  //   SkipList(insert_(increaseHeight(sl.head, newHeight), k, newHeight), max(sl.max_height, height)) 
+  //   SkipList(insert_(increaseHeight(sl.head, newHeight), k, newHeight), max(sl.maxHeight, height)) 
+  // }
+
+  // def insert(sl: SkipList, k: Int): SkipList = {
+  //   if (isIn(sl, k)) {
+  //     sl
+  //   }
+  //   def getRandomLevel(rd: Random, acc: Int): Int = {if (rd.nextInt(2) == 0) {acc} else {getRandomLevel(rd, acc+1)}}
+  //   val r = new Random
+  //   val height = getRandomLevel(r, 0)
+  //   //println("random height : " + height)
+  //   insert(sl, k, height)
   // }
 
   // def findNewDown(t: Node, v: Int): Node = t match {
@@ -105,47 +111,70 @@ object SkipList {
   // }
 
   // def remove(sl: SkipList, k: Int): SkipList = {
-  //   def remove_(t: Node, k: Int): Node = t match { // Returns the list with k removed
-  //     case SkipNode(value, down, right, height) => {
-  //       val lowerLeftmostNode = remove_(down, k)
-  //       removeRight(t, k, lowerLeftmostNode)
-  //     }
-  //     case Leaf => Leaf // Found a leaf (we are at level -1)
-  //   }
-
-  //   def removeRight(t: Node, k: Int, lowerLevel: Node): Node = t match {
-  //     case SkipNode(value, down, right, height) => {
-  //       val newDown = findNewDown(lowerLevel, value)
-  //       right match {
-  //         case SkipNode(valueR, downR, rightR, heightR) => {
-  //           if (valueR == k) { // Remove right
-  //             SkipNode(value, newDown, removeRight(rightR, k, newDown), height)
-  //           }
-  //           else { // Value is not the next node, just recurse to the right
-  //             SkipNode(value, newDown, removeRight(right, k, newDown), height)
-  //           }
-  //         }
-  //         case Leaf => SkipNode(value, newDown, Leaf, height) // Reached end of this level, just update lower node
+  //   require(isSkipList(sl))
+  //   require(k != Int.MinValue)
+  //   def remove_(t: Node, k: Int): Node = {
+  //     require(isSkipList(t))
+  //     decreases(size(t))
+  //     t match { // Returns the list with k removed
+  //       case SkipNode(value, down, right, height) => {
+  //         val lowerLeftmostNode = remove_(down, k)
+  //         removeRight(t, k, lowerLeftmostNode)
   //       }
+  //       case Leaf => Leaf // Found a leaf (we are at level -1)
   //     }
-  //     case Leaf => Leaf
   //   }
 
-  //   SkipList(remove_(sl.head, k), sl.max_height)
+  //   def removeRight(t: Node, k: Int, lowerLevel: Node): Node = {
+  //     require(isSkipList(t))
+  //     require(isSkipList(lowerLevel))
+  //     decreases(size(t)) // TODO : Does not work because lowerLevel can be arbitrary. Require that it has some connection to the actual lower level
+  //     t match {
+  //       case SkipNode(value, down, right, height) => {
+  //         val newDown = findNewDown(lowerLevel, value)
+  //         right match {
+  //           case SkipNode(valueR, downR, rightR, heightR) => {
+  //             if (valueR == k) { // Remove right
+  //               assert(size(right) < size(t))
+  //               val hope = removeRight(rightR, k, newDown)
+  //               SkipNode(value, newDown, hope, height)
+  //             }
+  //             else { // Value is not the next node, just recurse to the right
+  //               val hope = removeRight(right, k, newDown)
+  //               SkipNode(value, newDown, hope, height)
+  //             }
+  //           }
+  //           case Leaf => SkipNode(value, newDown, Leaf, height) // Reached end of this level, just update lower node
+  //         }
+  //       }
+  //       case Leaf => Leaf
+  //     }
+  //   }
+
+  //   SkipList(remove_(sl.head, k), sl.maxHeight)
   // }
 
-/*
- def isIn(sl: SkipList, k: Int): Boolean = {
-   require(isSkipList(sl))
-   search(sl, k) match {
-     case None() => false
-     case Some(value) => true
-   }
- }
-*/
+  
+  // def isIn(sl: SkipList, k: Int): Boolean = {
+  //   search(sl, k) match {
+  //     case None() => false
+  //     case Some(value) => true
+  //   }
+  // }
 
+  def size(t: Node): BigInt = t match {
+    case SkipNode(value, down, right, height) => 1 + size(down) + sizeRight(right)
+    case Leaf => 0
+  }
+
+  def sizeRight(t: Node): BigInt = t match {
+    case SkipNode(value, down, right, height) => 1 + sizeRight(right)
+    case Leaf => 0
+  }
+
+ //__________________________________________________________ASSERTIONS______________________________________________________
   /* SkipList structural properties
-  - max_Height >= heights >= 0
+  - maxHeight >= heights >= 0
 
   - if(n.h > 0) n.b.height = n.height - 1 and n.val == v.b.val
   - if(n.h == 0) n.b is leaf
@@ -159,22 +188,15 @@ object SkipList {
     case SkipNode(value, down, right, height) => forall(down, p) && forall(right, p)
   })
 
-  def hasCorrectHeight(node : Node): Boolean = {
+  def hasNonNegativeHeight(node : Node): Boolean = {
     node match {
-      case SkipNode(v,d,r,h) => h >= 0 && hasCorrectHeight(d) && hasCorrectHeight(r)
-      case Leaf => true
-    }
-  }
-
-  def maxHeightIsMaxHeight(maxHeight: Int)(node : Node): Boolean = {
-    node match {
-      case SkipNode(v,d,r,h) => h <= maxHeight && maxHeightIsMaxHeight(maxHeight)(d) && maxHeightIsMaxHeight(maxHeight)(r)
-      case Leaf => true
+      case SkipNode(v,d,r,h) => h >= 0 && hasNonNegativeHeight(d) && hasNonNegativeHeight(r)
+      case Leaf => true 
     }
   }
 
   def heightDecreasesDown(node : Node): Boolean = {
-    require(hasCorrectHeight(node) && bottom_and_right_is_leaf(node))
+    require(hasNonNegativeHeight(node))
     node match {
       case SkipNode(_,d,r,0) => d match {
         case Leaf => heightDecreasesDown(r)
@@ -185,79 +207,49 @@ object SkipList {
         case SkipNode(v2,_,_,h2) => (h1-1 == h2) && (v1 == v2) && heightDecreasesDown(d) && heightDecreasesDown(r)
       }
       case Leaf => true
-    } 
+    }
   }
 
   def increasesToTheRight(t: Node): Boolean = t match {
     case SkipNode(value, down, right, height) => right match {
-      case SkipNode(valueR, downR, rightR, heightR) => 
-        (
+      case SkipNode(valueR, _, _, heightR) => (
         height == heightR && 
-        value < valueR &&
-        increasesToTheRight(down) &&
+        value < valueR && 
+        increasesToTheRight(down) && 
         increasesToTheRight(right)
-        )
-      case Leaf => true
+      )
+      case Leaf => down match {
+        case SkipNode(_, _, _, _) => increasesToTheRight(down)
+        case Leaf => true
+      }
     }
-    case Leaf => true
-  }
-
-  def bottom_and_right_is_leaf(t: Node): Boolean = t match {
-    case SkipNode(_,d,r,_) => bottom_and_right_is_leaf(r) && bottom_and_right_is_leaf(d)
     case Leaf => true
   }
 
   def headIsMinInt(sl: SkipList) = sl.head match {
     case Leaf => false
-    case SkipNode(value, down, right, height) => value == Int.MinValue && sl.max_height >= 0 && height == sl.max_height
+    case SkipNode(value, down, right, height) => (
+      value == Int.MinValue && 
+      sl.maxHeight >= 0 && 
+      height <= sl.maxHeight
+    )
   }
 
   def isSkipList(sl: SkipList): Boolean = {
     if (!headIsMinInt(sl)) {false}
-    else if (hasCorrectHeight(sl.head) &&
-             maxHeightIsMaxHeight(sl.max_height)(sl.head) &&
-             bottom_and_right_is_leaf(sl.head) && increasesToTheRight(sl.head)) 
-    {
-      heightDecreasesDown(sl.head)
+    else if (hasNonNegativeHeight(sl.head)) {
+      heightDecreasesDown(sl.head) && increasesToTheRight(sl.head)
     }
     else {false}
   }
 
-  def height(n: Node): Int = n match {
-    case SkipNode(_,_,_,h) => h
-    case Leaf => -1
-  }
-
-  def east(n : Node): Int = {
-    require(bottom_and_right_is_leaf(n))
-    n match {
-      case SkipNode(_,_,r,_) => wrapping {1 + east(r)}
-      case Leaf => 0
+  def isSkipList(t: Node): Boolean = {
+    if (hasNonNegativeHeight(t)) {
+      heightDecreasesDown(t) && increasesToTheRight(t)
     }
+    else {false}
   }
-
-  def lem_right_east_less(n : SkipNode): Unit = {
-    require(bottom_and_right_is_leaf(n))
-    n.right match {
-      case x@SkipNode(_,d,r,h) => assert(east(n) == 1 + east(x))
-      case Leaf => assert(east(n) == 1)
-    }
-  }.ensuring(east(n.right) < east(n))
-
-  
-  def subtree_size(t: Node): Int = {
-    require(hasCorrectHeight(t) && heightDecreasesDown(t) && bottom_and_right_is_leaf(t) && increasesToTheRight(t))
-    decreases(height(t) + east(t))
-    t match {
-      case Leaf => 0
-      case x@SkipNode(value, down, right, h) => {
-        assert( height(right) == height(t))
-        lem_right_east_less(x)
-        1 + subtree_size(down) + subtree_size(right)
-      }
-    }
-  }
-  
+  //_________________________________________________INVARIANTS__________________________________________
   // Invariants : 
   // If sl is skiplist and insert element then result is also skiplist and search returns Some(x)
   // If search element in the list, it is found x
@@ -266,23 +258,13 @@ object SkipList {
   // Search is probabilistically log
   // Also first element is always -inf
 
-  
-  /*
+/*
   def inv_inserted_found(sl:SkipList, k: Int):Unit = {
     //TODO change hardcoded 0
   }.ensuring(_=> search(insert_h(sl, k, 0), k) == Some(k))
-  
-
-  def lem_search_is_k_or_none(sl:SkipList, k:Int): Unit = {
-    require(isSkipList(sl))
-  }.ensuring(_=> search(sl, k) == Some(k) || search(sl, k) == None())
 
   def inv_isin_search(sl: SkipList, k: Int): Unit = {
-    require(isSkipList(sl))
-
-    if(search(sl, k) == Some(k)) assert(isIn(sl, k))
-    else assert(search(sl, k) == None())
-
+    //can distinguish cases if needed
   }.ensuring(_=> isIn(sl, k) == (search(sl, k) == Some(k)))
 
   def inv_remove_notfound(sl:SkipList, k:Int) : Unit = {
@@ -299,23 +281,95 @@ object SkipList {
     }
   }
   */
+  //_________________________________________________________LEMMAS____________________________________________________
+  def elementOfSkipListIsSkipList(t: SkipNode): Unit = {
+    require(isSkipList(t))
+  } ensuring (_ => isSkipList(t.down) && isSkipList(t.right))
+
+  def sizeRightIsNonNegative(t: Node): Unit = {
+    t match {
+      case Leaf => ()
+      case SkipNode(value, down, right, height) => {sizeRightIsNonNegative(right)}
+    }
+  }.ensuring(_ => sizeRight(t) >= 0)
+
+  def sizeIsNonNegative(t: Node): Unit = {
+    t match {
+      case Leaf => ()
+      case SkipNode(value, down, right, height) => {
+        sizeIsNonNegative(down)
+        sizeRightIsNonNegative(right)
+      }
+    }
+  }.ensuring(_ => size(t) >= 0)
+
+  def sizeSkipNodeIsPositive(t: SkipNode): Unit = {
+    sizeIsNonNegative(t.down)
+    sizeRightIsNonNegative(t.right)
+  } ensuring (_ => size(t) > 0)
+
+  def sizeOfRightIsLower(t: SkipNode) = {
+    require(isSkipList(t))
+    t.right match {
+      case Leaf => {
+        sizeSkipNodeIsPositive(t)
+        assert(size(t.right) == 0)
+      }
+      case SkipNode(value, down, right, height) => {
+        assert(1 + size(down) + sizeRight(right) > size(right))
+      }
+    }
+  }.ensuring(_ => size(t) > size(t.right))
+
+  def hasUpperBoundedHeight(maxHeight: Int, t: Node) = t match {
+    case SkipNode(_, _, _, height) => height <= maxHeight
+    case Leaf => true
+  }
+
+  def downAndRightHaveUpperBoundedHeight(maxHeight: Int, t: Node) = t match {
+    case SkipNode(_, d, r, height) => height <= maxHeight && hasUpperBoundedHeight(maxHeight, d) && hasUpperBoundedHeight(maxHeight, r)
+    case Leaf => true 
+  }
+
+  def heightIsLessThanMaxHeight(maxHeight: Int, t: Node): Unit = {
+    require(isSkipList(t))
+    require(hasUpperBoundedHeight(maxHeight, t))
+  } ensuring (_ => downAndRightHaveUpperBoundedHeight(maxHeight, t))
+
+  def maxHeightIsMaxHeight(maxHeight: Int, t: Node): Boolean = t match {
+    case SkipNode(_, down, right, height) => (
+      height <= maxHeight && 
+      maxHeightIsMaxHeight(maxHeight, down) &&
+      maxHeightIsMaxHeight(maxHeight, right)
+    )
+    case Leaf => true
+  }
+
+  def maxHeightIsMaxHeightLemma(maxHeight: Int, t: SkipNode): Unit = {
+    require(isSkipList(t))
+    require(t.height <= maxHeight)
+    t.right match {
+      case r@SkipNode(_, _, _, _) => maxHeightIsMaxHeightLemma(maxHeight, r)
+      case Leaf => ()
+    }
+    t.down match {
+      case d@SkipNode(_, _, _, _) => maxHeightIsMaxHeightLemma(maxHeight, d)
+      case Leaf => ()
+    }
+  } ensuring (_ => maxHeightIsMaxHeight(maxHeight, t))
+
+  def maxHeightIsMaxHeightLemma(sl: SkipList): Unit = {
+    require(isSkipList(sl))
+    sl.head match {
+      case h@SkipNode(value, down, right, height) => maxHeightIsMaxHeightLemma(sl.maxHeight, h)
+      case Leaf => ()
+    }
+  } ensuring (_ => maxHeightIsMaxHeight(sl.maxHeight, sl.head))
 
 
+  //_________________________________________________________TESTING___________________________________________________
 
 /*
-  @ignore
-  def insert(sl: SkipList, k: Int): SkipList = {
-    if (isIn(sl, k)) {
-      sl
-    }
-    def getRandomLevel(rd: Random, acc: Int): Int = {if (rd.nextInt(2) == 0) {acc} else {getRandomLevel(rd, acc+1)}}
-    val r = new Random
-    val height = getRandomLevel(r, 0)
-    //println("random height : " + height)
-    insert_h(sl, k, height)
-  }
-  
-
   @ignore
   def printList(sl: SkipList): Unit = {
     def printLevel(t: Node): Unit = t match {
