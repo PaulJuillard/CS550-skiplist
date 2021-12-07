@@ -162,16 +162,6 @@ object SkipList {
   //   }
   // }
 
-  def size(t: Node): BigInt = t match {
-    case SkipNode(value, down, right, height) => 1 + size(down) + sizeRight(right)
-    case Leaf => 0
-  }
-
-  def sizeRight(t: Node): BigInt = t match {
-    case SkipNode(value, down, right, height) => 1 + sizeRight(right)
-    case Leaf => 0
-  }
-
  //__________________________________________________________AXIOMS______________________________________________________
   /* SkipList structural properties. They all must also be true recursively for the down and right nodes except the last one
   - heights >= 0
@@ -221,10 +211,11 @@ object SkipList {
       }
     }
     case Leaf => true
-  }
+  } 
 
   def isInRightSubtree(target: Node, of: Node): Boolean = {
     (target, of) match {
+      case (Leaf, Leaf) => false
       case (Leaf, _) => true
       case (_, Leaf) => false
       case (SkipNode(_, _, _, _), SkipNode(_, _, rOf, _)) => {
@@ -292,7 +283,7 @@ object SkipList {
   // def subtree_size(t: Node): BigInt = {
   //   require(isSkipList(t))
   //   decreases(nodeHeight(t) + east(t))
-  //   t match {
+  //   t match { 
   //     case Leaf => 0
   //     case x@SkipNode(value, down, right, h) => {
   //       assert(nodeHeight(right) <= nodeHeight(t))
@@ -308,7 +299,6 @@ object SkipList {
   // If remove then search, not found x
   // Every level is a subset of the level below
   // Search is probabilistically log
-  // Also first element is always -inf
 
 /*
   def inv_inserted_found(sl:SkipList, k: Int):Unit = {
@@ -339,34 +329,6 @@ object SkipList {
     assert(levelsAxiom(t.down))
     assert(levelsAxiom(t.right))
   } ensuring (_ => isSkipList(t.down) && isSkipList(t.right))
-
-
-  // Proof that size(right) decreases (TODO)
-  def sizeRightIsNonNegative(t: Node): Unit = {
-    t match {
-      case Leaf => ()
-      case SkipNode(value, down, right, height) => sizeRightIsNonNegative(right)
-    }
-  }.ensuring(_ => sizeRight(t) >= 0)
-
-  def sizeIsNonNegative(t: Node): Unit = {
-    t match {
-      case Leaf => ()
-      case SkipNode(value, down, right, height) => {
-        sizeIsNonNegative(down)
-        sizeRightIsNonNegative(right)
-      }
-    }
-  }.ensuring(_ => size(t) >= 0)
-
-  def sizeSkipNodeIsPositive(t: SkipNode): Unit = {
-    sizeIsNonNegative(t.down)
-    sizeRightIsNonNegative(t.right)
-  } ensuring (_ => size(t) > 0)
-
-  def sizeOfRightIsLower(t: SkipNode) = { // TODO : Times out
-    require(isSkipList(t))
-  }.ensuring(_ => size(t) > size(t.right))
 
 
   // Proof of maxHeightIsMaxHeight for both nodes and skiplists
@@ -464,17 +426,201 @@ object SkipList {
   } ensuring (_ => isInRightSubtree(n3, n1))
 
 
-  // Proof of the levels lemma (TODO)
+  // Proof of the levels lemma
   def levelsLemma(n: SkipNode, x: SkipNode): Unit = {
     require(isSkipList(n))
     require(isSkipList(x))
     require(isInRightSubtree(x, n))
+    if (n.right != x) {
+      n.right match {
+        case r@SkipNode(_, _, _, _) => {
+          levelsLemma(r, x)
+          (n.down, r.down, x.down) match {
+            case (nD@SkipNode(_, _, _, _), rD@SkipNode(_, _, _, _), xD@SkipNode(_, _, _, _)) => isInRightSubtreeTransitive(nD, rD, xD)
+            case _ => ()
+          }
+        }
+      }
+    }
   } ensuring (_ => isInRightSubtree(x.down, n.down))
+
+
+  // Proof that size(right) decreases (TODO)
+  def sizeRightIsNonNegative(t: Node): Unit = {
+    t match {
+      case Leaf => ()
+      case SkipNode(value, down, right, height) => sizeRightIsNonNegative(right)
+    }
+  }.ensuring(_ => sizeRight(t) >= 0)
+
+  def sizeIsNonNegative(t: Node): Unit = {
+    t match {
+      case Leaf => ()
+      case SkipNode(value, down, right, height) => {
+        sizeIsNonNegative(down)
+        sizeRightIsNonNegative(right)
+      }
+    }
+  }.ensuring(_ => size(t) >= 0)
+
+  def sizeSkipNodeIsPositive(t: SkipNode): Unit = {
+    sizeIsNonNegative(t.down)
+    sizeRightIsNonNegative(t.right)
+  } ensuring (_ => size(t) > 0)
+  
+  // Weird behavior, ask questions
+  // def sizeOfRightIsLower(t: SkipNode): Unit = {
+  //   require(isSkipList(t))
+  //   t.right match {
+  //     case right@SkipNode(_, downR, _, _) => {
+  //       t.down match {
+  //         case down@SkipNode(_, _, rightD, _) => {
+  //           sizeOfRightIsLower(down)
+  //           if (rightD == downR) {
+  //             assert(size(down) >= size(downR))
+  //           }
+  //           else {
+  //             sizeOfRightIsLower(down)
+  //             assert(size(down) >= size(downR))
+  //           }
+  //         }
+  //         case Leaf => {
+  //           assert(size(t.down) >= size(downR))
+  //         }
+  //       }
+  //       assert(size(t.down) >= size(downR))
+  //     }
+  //     case Leaf => sizeSkipNodeIsPositive(t)
+  //   }
+  // }.ensuring(_ => size(t) > size(t.right))
+
+  def isLeafOrSizeAtRightIsLower(n: Node, x: Node): Boolean = (n, x) match {
+    case (Leaf, _) => true
+    case (_, Leaf) => true
+    case (n@SkipNode(_, _, _, _), x@SkipNode(_, _, _, _)) => size(n) > size(x)
+  }
+
+  def rightDistance(n: Node): BigInt = n match {
+    case SkipNode(_, _, right, _) => 1 + rightDistance(right)
+    case Leaf => 0
+  }
+
+  def isNotInRightSubtree(target: Node, of: Node): Boolean = {
+    (target, of) match {
+      case (Leaf, _) => false
+      case (_, Leaf) => true
+      case (SkipNode(_, _, _, _), SkipNode(_, _, rOf, _)) => {
+        target != rOf && isNotInRightSubtree(target, rOf)
+      }
+    }
+  }
+
+  def trivialLemma(n: Node, x: Node): Unit = {
+    require(isNotInRightSubtree(x, n))
+    n match {
+      case SkipNode(value, down, right, height) => {
+        assert(x != right)
+        trivialLemma(right, x)
+      }
+      case Leaf => ()
+    }
+  } ensuring (_ => !isInRightSubtree(x, n))
+
+  def isInRightSubtreeAntiReflexive(n: Node, x: Node): Unit = {
+    require(isSkipList(n))
+    require(isSkipList(x))
+    require(isInRightSubtree(x, n))
+    (n, x) match {
+      case (_, Leaf) => assert(isNotInRightSubtree(n, x))
+      case (n@SkipNode(_, _, rightN, _), x@SkipNode(_, _, _, _)) => {
+        assert(rightN == x || isInRightSubtree(x, rightN))
+        if (rightN == x) {
+          assume(isNotInRightSubtree(n, x)) // TODO : Remove assume
+          assert(isNotInRightSubtree(n, x))
+        }
+        else {
+          assert(isInRightSubtree(x, rightN))
+          isInRightSubtreeAntiReflexive(rightN, x)
+          assume(isNotInRightSubtree(n, x)) // TODO : Remove assume
+          assert(isNotInRightSubtree(n, x))
+        }
+      }
+    }
+  } ensuring (_ => isNotInRightSubtree(n, x))
+
+  def notInOwnRightSubtree(n: SkipNode): Unit = {
+    require(isSkipList(n))
+    assert(isInRightSubtree(n.right, n))
+    isInRightSubtreeAntiReflexive(n, n.right)
+    trivialLemma(n.right, n)
+  } ensuring (!isInRightSubtree(n, n.right))
+
+  def equalityImpliesNotInRightSubTree(n: Node, x: Node): Unit = {
+    require(isSkipList(n))
+    require(n == x)
+    n match {
+      case n@SkipNode(value, down, right, height) => {
+        notInOwnRightSubtree(n)
+      }
+      case Leaf => ()
+    }
+  } ensuring (_ => !isInRightSubtree(x, n) || n == Leaf)
+
+  def inRightSubtreeImpliesDifference(n: Node, x: Node): Unit = {
+    require(isSkipList(n))
+    require(isSkipList(x))
+    require(isInRightSubtree(x, n))
+    if (n == x) {
+      equalityImpliesNotInRightSubTree(n, x)
+    }
+  } ensuring (_ => n != x || n == Leaf)
+
+  def sizeAtRightIsLower(n: Node, x: Node): Unit = {
+    require(isSkipList(n))
+    require(isSkipList(x))
+    require(isInRightSubtree(x, n))
+    decreases(rightDistance(n) - rightDistance(x))
+    n match {
+      case SkipNode(_, down, right, _) => right match {
+        case right@SkipNode(_, downR, _, _) => {
+          if (right != x) {
+            inRightSubtreeImpliesDifference(n, x)
+            assert(n != x)
+            sizeAtRightIsLower(right, x)
+            sizeAtRightIsLower(n, right)
+            assert(isLeafOrSizeAtRightIsLower(n, x))
+          }
+          else {
+            assert(sizeRight(n) > sizeRight(x))
+            sizeAtRightIsLower(down, downR)
+            assert(size(down) >= size(downR))
+            assert(size(n) > size(x))
+          }
+        }
+        case Leaf => assert(isLeafOrSizeAtRightIsLower(n, x))
+      }
+      case Leaf => ()
+    }
+  } ensuring (_ => isLeafOrSizeAtRightIsLower(n, x))
+
+  def assume(b: Boolean): Unit = {
+
+  } ensuring (_ => b)
 
 
   // Auxiliary functions
   def isSkipNode(n: Node): Boolean = n match {case _ => true; case Leaf => false}
   def isLeaf(n: Node): Boolean = !isSkipNode(n)
+
+  def size(t: Node): BigInt = t match {
+    case SkipNode(value, down, right, height) => 1 + size(down) + sizeRight(right)
+    case Leaf => 0
+  }
+
+  def sizeRight(t: Node): BigInt = t match {
+    case SkipNode(value, down, right, height) => 1 + sizeRight(right)
+    case Leaf => 0
+  }
 
 
   //_________________________________________________________TESTING___________________________________________________
