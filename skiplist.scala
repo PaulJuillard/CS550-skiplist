@@ -379,20 +379,9 @@ object SkipList {
   } ensuring (_ => maxHeightIsMaxHeight(sl.maxHeight, sl.head))
 
 
-  // Proof of isInRightSubTree transitivity
-  def ifNodeHasDownAllRightNodesHaveDown(n: SkipNode, x: SkipNode): Unit = {
-    require(isSkipList(n))
-    require(isSkipList(x))
-    require(isInRightSubtree(x, n))
-    require(isSkipNode(n.down))
-  } ensuring (_ => isSkipNode(x.down))
-
-  def ifSkipNodeInRightSubtreeRightIsNotLeaf(n: SkipNode, x: SkipNode): Unit = {
-    require(isSkipList(n))
-    require(isSkipList(x))
-    require(isInRightSubtree(x, n))
-  } ensuring (_ => isSkipNode(n.right))
-
+  // Proof of isInRightSubTree transitivity : Lemmas that didn't even need to be proven :
+  // If x is in n's right subtree and n.down is not a Leaf, then x.down is not a Leaf
+  // If x is in n's right subtree then n is not a Leaf
   def rightIsAlsoInRightSubtree(n: SkipNode, x: SkipNode): Unit = {
     require(isInRightSubtree(x, n))
     n.right match {
@@ -406,9 +395,6 @@ object SkipList {
   } ensuring (_ => isInRightSubtree(x.right, n))
 
   def isInRightSubtreeTransitive(n1: SkipNode, n2: SkipNode, n3: SkipNode): Unit = {
-    require(isSkipList(n1))
-    require(isSkipList(n2))
-    require(isSkipList(n3))
     require(isInRightSubtree(n2, n1))
     require(isInRightSubtree(n3, n2))
     if (n3 != n2.right) {
@@ -425,7 +411,7 @@ object SkipList {
   } ensuring (_ => isInRightSubtree(n3, n1))
 
 
-  // Proof of the levels lemma
+  // Proof of the levels lemma :  with n and x skiplists, if x is in n's right subtree, then x.down is in n.down's right subtree
   def levelsLemma(n: SkipNode, x: SkipNode): Unit = {
     require(isSkipList(n))
     require(isSkipList(x))
@@ -444,7 +430,7 @@ object SkipList {
   } ensuring (_ => isInRightSubtree(x.down, n.down))
 
 
-  // Proof that size(right) decreases (TODO)
+  // Proof that size(right) decreases
   def sizeRightIsNonNegative(t: Node): Unit = {
     t match {
       case Leaf => ()
@@ -491,18 +477,11 @@ object SkipList {
     require(sizeRight(n) >= 0)
     decreases(sizeRight(n))
     sizeRightIsNonNegative(n)
-    assert(isSkipNode(n))
     n match {
       case n@SkipNode(value, down, right, height) => {
-        if (x == right) {
-          assert(sizeRight(n) == sizeRight(x) + 1)
-        }
-        else {
-          assert(sizeRight(n) == sizeRight(right) + 1)
+        if (x != right) {
           x match {
             case x@SkipNode(_, _, _, _) => {
-              rightIsAlsoInRightSubtree(n, x)
-              sizeRightIsNonNegative(n)
               inRightSubtreeImpliesLowerMeasure(right, x)
             }
             case Leaf => ()
@@ -517,36 +496,20 @@ object SkipList {
     require(isSkipList(x))
     require(isInRightSubtree(x, n))
     require(nodeHeight(n) >= 0)
-    decreases(nodeHeight(n)) // TODO : Find a good measure, or find a way to recurse while decreasing something
+    decreases(nodeHeight(n))
     n match {
       case n@SkipNode(_, down, right, _) => x match {
         case x@SkipNode(_, downR, rightR, _) => {
           sizeRightIsNonNegative(n)
           inRightSubtreeImpliesLowerMeasure(n, x)
-          assert(sizeRight(right) >= sizeRight(x))
           levelsLemma(n, x)
-          assert(size(n) == 1 + sizeRight(right) + size(down))
-          assert(size(x) == 1 + sizeRight(rightR) + size(downR))
           nodeHeightIsNonNegative(down)
           sizeAtRightIsLower(down, downR)
-          (down, downR) match {
-            case (Leaf, _) => assert(isLeafOrSizeAtRightIsLower(n, x))
-            case (down@SkipNode(_, _, _, _), Leaf) => {
-              assert(size(downR) == 0)
-              sizeSkipNodeIsPositive(down)
-              assume(size(down) > size(downR))
-              assert(size(n) > size(x))
-              assert(isLeafOrSizeAtRightIsLower(n, x))
-            }
-            case (SkipNode(_, _, _, _), SkipNode(_, _, _, _)) => {
-              assert(size(down) > size(downR))
-              assert(size(n) > size(x))
-              assert(isLeafOrSizeAtRightIsLower(n, x))
-            }
+          down match {
+            case (down@SkipNode(_, _, _, _)) => sizeSkipNodeIsPositive(down)
           }
-          assert(isLeafOrSizeAtRightIsLower(n, x))
         }
-        case Leaf => assert(isLeafOrSizeAtRightIsLower(n, x))
+        case Leaf => ()
       }
       case Leaf => ()
     }
