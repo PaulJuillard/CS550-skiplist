@@ -460,37 +460,18 @@ object SkipList {
       }
     }
   }.ensuring(_ => size(t) >= 0)
+  
+  def nodeHeightIsNonNegative(t: Node): Unit = {
+    t match {
+      case Leaf => ()
+      case SkipNode(value, down, right, height) => nodeHeightIsNonNegative(down)
+    }
+  }.ensuring(_ => nodeHeight(t) >= 0)
 
   def sizeSkipNodeIsPositive(t: SkipNode): Unit = {
     sizeIsNonNegative(t.down)
     sizeRightIsNonNegative(t.right)
   } ensuring (_ => size(t) > 0)
-  
-  // Weird behavior, ask questions
-  // def sizeOfRightIsLower(t: SkipNode): Unit = {
-  //   require(isSkipList(t))
-  //   t.right match {
-  //     case right@SkipNode(_, downR, _, _) => {
-  //       t.down match {
-  //         case down@SkipNode(_, _, rightD, _) => {
-  //           sizeOfRightIsLower(down)
-  //           if (rightD == downR) {
-  //             assert(size(down) >= size(downR))
-  //           }
-  //           else {
-  //             sizeOfRightIsLower(down)
-  //             assert(size(down) >= size(downR))
-  //           }
-  //         }
-  //         case Leaf => {
-  //           assert(size(t.down) >= size(downR))
-  //         }
-  //       }
-  //       assert(size(t.down) >= size(downR))
-  //     }
-  //     case Leaf => sizeSkipNodeIsPositive(t)
-  //   }
-  // }.ensuring(_ => size(t) > size(t.right))
 
   def isLeafOrSizeAtRightIsLower(n: Node, x: Node): Boolean = (n, x) match {
     case (Leaf, _) => true
@@ -498,41 +479,29 @@ object SkipList {
     case (n@SkipNode(_, _, _, _), x@SkipNode(_, _, _, _)) => size(n) > size(x)
   }
 
-  def rightDistance(n: Node): BigInt = n match {
-    case SkipNode(_, _, right, _) => 1 + rightDistance(right)
-    case Leaf => 0
-  }
-
-  def rightDistanceIsNonNegative(n: Node): Unit = {
-    n match {
-      case SkipNode(_, _, r, _) => rightDistanceIsNonNegative(r)
-      case Leaf => ()
-    }
-  } ensuring (_ => rightDistance(n) >= 0)
-
   def inRightSubtreeImpliesDifference(n: Node, x: Node): Unit = {
     require(isInRightSubtree(x, n))
-    rightDistanceIsNonNegative(n)
+    sizeRightIsNonNegative(n)
     inRightSubtreeImpliesLowerMeasure(n, x)
   } ensuring (_ => n != x)
   
   def inRightSubtreeImpliesLowerMeasure(n: Node, x: Node): Unit = {
     require(isInRightSubtree(x, n))
-    require(rightDistance(n) >= 0)
-    decreases(rightDistance(n))
-    rightDistanceIsNonNegative(n)
+    require(sizeRight(n) >= 0)
+    decreases(sizeRight(n))
+    sizeRightIsNonNegative(n)
     assert(isSkipNode(n))
     n match {
       case n@SkipNode(value, down, right, height) => {
         if (x == right) {
-          assert(rightDistance(n) == rightDistance(x) + 1)
+          assert(sizeRight(n) == sizeRight(x) + 1)
         }
         else {
-          assert(rightDistance(n) == rightDistance(right) + 1)
+          assert(sizeRight(n) == sizeRight(right) + 1)
           x match {
             case x@SkipNode(_, _, _, _) => {
               rightIsAlsoInRightSubtree(n, x)
-              rightDistanceIsNonNegative(n)
+              sizeRightIsNonNegative(n)
               inRightSubtreeImpliesLowerMeasure(right, x)
             }
             case Leaf => ()
@@ -540,29 +509,41 @@ object SkipList {
         }
       }
     }
-  } ensuring (_ => rightDistance(n) > rightDistance(x))
+  } ensuring (_ => sizeRight(n) > sizeRight(x))
 
   def sizeAtRightIsLower(n: Node, x: Node): Unit = {
     require(isSkipList(n))
     require(isSkipList(x))
     require(isInRightSubtree(x, n))
-    decreases(rightDistance(n) - rightDistance(x)) // TODO : Find a good measure, or find a way to recurse while decreasing something
+    require(nodeHeight(n) >= 0)
+    decreases(nodeHeight(n)) // TODO : Find a good measure, or find a way to recurse while decreasing something
     n match {
-      case SkipNode(_, down, right, _) => right match {
-        case right@SkipNode(_, downR, _, _) => {
-          if (right != x) {
-            inRightSubtreeImpliesDifference(n, x)
-            assert(n != x)
-            sizeAtRightIsLower(right, x)
-            sizeAtRightIsLower(n, right)
-            assert(isLeafOrSizeAtRightIsLower(n, x))
+      case n@SkipNode(_, down, right, _) => x match {
+        case x@SkipNode(_, downR, rightR, _) => {
+          sizeRightIsNonNegative(n)
+          inRightSubtreeImpliesLowerMeasure(n, x)
+          assert(sizeRight(right) >= sizeRight(x))
+          levelsLemma(n, x)
+          assert(size(n) == 1 + sizeRight(right) + size(down))
+          assert(size(x) == 1 + sizeRight(rightR) + size(downR))
+          nodeHeightIsNonNegative(down)
+          sizeAtRightIsLower(down, downR)
+          (down, downR) match {
+            case (Leaf, _) => assert(isLeafOrSizeAtRightIsLower(n, x))
+            case (down@SkipNode(_, _, _, _), Leaf) => {
+              assert(size(downR) == 0)
+              sizeSkipNodeIsPositive(down)
+              assume(size(down) > size(downR))
+              assert(size(n) > size(x))
+              assert(isLeafOrSizeAtRightIsLower(n, x))
+            }
+            case (SkipNode(_, _, _, _), SkipNode(_, _, _, _)) => {
+              assert(size(down) > size(downR))
+              assert(size(n) > size(x))
+              assert(isLeafOrSizeAtRightIsLower(n, x))
+            }
           }
-          else {
-            assert(sizeRight(n) > sizeRight(x))
-            sizeAtRightIsLower(down, downR)
-            assert(size(down) >= size(downR))
-            assert(size(n) > size(x))
-          }
+          assert(isLeafOrSizeAtRightIsLower(n, x))
         }
         case Leaf => assert(isLeafOrSizeAtRightIsLower(n, x))
       }
