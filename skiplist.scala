@@ -130,16 +130,17 @@ object SkipList {
   //     require(isSkipList(lowerLevel))
   //     decreases(size(t))
   //     t match {
-  //       case SkipNode(value, down, right, height) => {
+  //       case t@SkipNode(value, down, right, height) => {
   //         val newDown = findNewDown(lowerLevel, value)
   //         right match {
   //           case SkipNode(valueR, downR, rightR, heightR) => {
   //             if (valueR == k) { // Remove right
-  //               assert(size(right) < size(t))
+  //               sizeDecreasesToTheRight(t)
   //               val hope = removeRight(rightR, k, newDown)
   //               SkipNode(value, newDown, hope, height)
   //             }
   //             else { // Value is not the next node, just recurse to the right
+  //               sizeDecreasesToTheRight(t)
   //               val hope = removeRight(right, k, newDown)
   //               SkipNode(value, newDown, hope, height)
   //             }
@@ -550,6 +551,18 @@ object SkipList {
       case Leaf => ()
     }
   } ensuring (_ => isLeafOrSizeAtRightIsLower(n, x))
+
+  def sizeDecreasesToTheRight(n: SkipNode): Unit = {
+    require(isSkipList(n))
+    nodeHeightIsNonNegative(n)
+    sizeAtRightIsLower(n, n.right)
+    n.right match {
+      case SkipNode(_, _, _, _) => assert(size(n) > size(n.right))
+      case Leaf => {
+        sizeSkipNodeIsPositive(n)
+      }
+    }
+  } ensuring (_ => size(n) > size(n.right))
 
   def assume(b: Boolean): Unit = {
 
