@@ -393,8 +393,6 @@ object SkipList {
   } ensuring (_ => isSkipNode(n.right))
 
   def rightIsAlsoInRightSubtree(n: SkipNode, x: SkipNode): Unit = {
-    require(isSkipList(n))
-    require(isSkipList(x))
     require(isInRightSubtree(x, n))
     n.right match {
       case Leaf => ()
@@ -505,81 +503,50 @@ object SkipList {
     case Leaf => 0
   }
 
-  def isNotInRightSubtree(target: Node, of: Node): Boolean = {
-    (target, of) match {
-      case (Leaf, _) => false
-      case (_, Leaf) => true
-      case (SkipNode(_, _, _, _), SkipNode(_, _, rOf, _)) => {
-        target != rOf && isNotInRightSubtree(target, rOf)
-      }
-    }
-  }
-
-  def trivialLemma(n: Node, x: Node): Unit = {
-    require(isNotInRightSubtree(x, n))
+  def rightDistanceIsNonNegative(n: Node): Unit = {
     n match {
-      case SkipNode(value, down, right, height) => {
-        assert(x != right)
-        trivialLemma(right, x)
-      }
+      case SkipNode(_, _, r, _) => rightDistanceIsNonNegative(r)
       case Leaf => ()
     }
-  } ensuring (_ => !isInRightSubtree(x, n))
-
-  def isInRightSubtreeAntiReflexive(n: Node, x: Node): Unit = { // TODO : Finish this proof. Might require transifivity of isNotInRightSubtree
-    require(isSkipList(n))
-    require(isSkipList(x))
-    require(isInRightSubtree(x, n))
-    (n, x) match {
-      case (_, Leaf) => assert(isNotInRightSubtree(n, x))
-      case (n@SkipNode(_, _, rightN, _), x@SkipNode(_, _, _, _)) => {
-        assert(rightN == x || isInRightSubtree(x, rightN))
-        if (rightN == x) {
-          assume(isNotInRightSubtree(n, x)) // TODO : Remove assume
-          assert(isNotInRightSubtree(n, x))
-        }
-        else {
-          assert(isInRightSubtree(x, rightN))
-          isInRightSubtreeAntiReflexive(rightN, x)
-          assume(isNotInRightSubtree(n, x)) // TODO : Remove assume
-          assert(isNotInRightSubtree(n, x))
-        }
-      }
-    }
-  } ensuring (_ => isNotInRightSubtree(n, x))
-
-  def notInOwnRightSubtree(n: SkipNode): Unit = {
-    require(isSkipList(n))
-    assert(isInRightSubtree(n.right, n))
-    isInRightSubtreeAntiReflexive(n, n.right)
-    trivialLemma(n.right, n)
-  } ensuring (!isInRightSubtree(n, n.right))
-
-  def equalityImpliesNotInRightSubTree(n: Node, x: Node): Unit = {
-    require(isSkipList(n))
-    require(n == x)
-    n match {
-      case n@SkipNode(value, down, right, height) => {
-        notInOwnRightSubtree(n)
-      }
-      case Leaf => ()
-    }
-  } ensuring (_ => !isInRightSubtree(x, n) || n == Leaf)
+  } ensuring (_ => rightDistance(n) >= 0)
 
   def inRightSubtreeImpliesDifference(n: Node, x: Node): Unit = {
-    require(isSkipList(n))
-    require(isSkipList(x))
     require(isInRightSubtree(x, n))
-    if (n == x) {
-      equalityImpliesNotInRightSubTree(n, x)
+    rightDistanceIsNonNegative(n)
+    inRightSubtreeImpliesLowerMeasure(n, x)
+  } ensuring (_ => n != x)
+  
+  def inRightSubtreeImpliesLowerMeasure(n: Node, x: Node): Unit = {
+    require(isInRightSubtree(x, n))
+    require(rightDistance(n) >= 0)
+    decreases(rightDistance(n))
+    rightDistanceIsNonNegative(n)
+    assert(isSkipNode(n))
+    n match {
+      case n@SkipNode(value, down, right, height) => {
+        if (x == right) {
+          assert(rightDistance(n) == rightDistance(x) + 1)
+        }
+        else {
+          assert(rightDistance(n) == rightDistance(right) + 1)
+          x match {
+            case x@SkipNode(_, _, _, _) => {
+              rightIsAlsoInRightSubtree(n, x)
+              rightDistanceIsNonNegative(n)
+              inRightSubtreeImpliesLowerMeasure(right, x)
+            }
+            case Leaf => ()
+          }
+        }
+      }
     }
-  } ensuring (_ => n != x || n == Leaf)
+  } ensuring (_ => rightDistance(n) > rightDistance(x))
 
   def sizeAtRightIsLower(n: Node, x: Node): Unit = {
     require(isSkipList(n))
     require(isSkipList(x))
     require(isInRightSubtree(x, n))
-    decreases(rightDistance(n) - rightDistance(x)) // TODO : Prove that measure decreases and is non-negative when x is in n's right subtree
+    decreases(rightDistance(n) - rightDistance(x)) // TODO : Find a good measure, or find a way to recurse while decreasing something
     n match {
       case SkipNode(_, down, right, _) => right match {
         case right@SkipNode(_, downR, _, _) => {
