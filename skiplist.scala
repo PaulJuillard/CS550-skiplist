@@ -10,29 +10,29 @@ object SkipList {
   case class SkipNode(value: Int, down: Node, right: Node, height: Int) extends Node
   case object Leaf extends Node
   
-  // def search(sl: SkipList, target: Int): Option[Int] = {
-  //   def search_(t: Node, target: Int): Option[Int] = t match {
-  //     case SkipNode(v,d,r,_) =>
-  //         if (v == target) { 
-  //           Some(v) 
-  //         }
-  //         else {
-  //           r match {
-  //             case SkipNode(vR,_,_,_) => 
-  //               if (vR <= target) { // If value is somewhere to the right, go right
-  //                 search_(r, target)
-  //               }
-  //               else { // If not, try down
-  //                 search_(d, target)
-  //               }
-  //             case Leaf => search_(d, target) // Reached the end of this level, go down
-  //           }
-  //         }
-  //     case Leaf => None()
+  def search(sl: SkipList, target: Int): Option[Int] = {
+    def search_(t: Node, target: Int): Option[Int] = t match {
+      case SkipNode(v,d,r,_) =>
+          if (v == target) { 
+            Some(v) 
+          }
+          else {
+            r match {
+              case SkipNode(vR,_,_,_) => 
+                if (vR <= target) { // If value is somewhere to the right, go right
+                  search_(r, target)
+                }
+                else { // If not, try down
+                  search_(d, target)
+                }
+              case Leaf => search_(d, target) // Reached the end of this level, go down
+            }
+          }
+      case Leaf => None()
   
-  //   }
-  //   search_(sl.head, target)
-  // }
+    }
+    search_(sl.head, target)
+  }
 
   // def insert(sl: SkipList, k: Int, height: Int): SkipList = {
   //   require(height>=0)
@@ -105,56 +105,66 @@ object SkipList {
   //   insert(sl, k, height)
   // }
 
-  // def findNewDown(t: Node, v: Int): Node = t match {
-  //   case SkipNode(value, down, right, height) => if (value == v) {t} else {findNewDown(right, v)}
-  //   case Leaf => Leaf
-  // }
+  def findNewDown(t: Node, v: Int): Node = t match {
+    case SkipNode(value, down, right, height) => if (value == v) {t} else {findNewDown(right, v)}
+    case Leaf => Leaf
+  }
 
-  // def remove(sl: SkipList, k: Int): SkipList = {
-  //   require(isSkipList(sl))
-  //   require(k != Int.MinValue)
-  //   def remove_(t: Node, k: Int): Node = {
-  //     require(isSkipList(t))
-  //     decreases(size(t))
-  //     t match { // Returns the list with k removed
-  //       case SkipNode(value, down, right, height) => {
-  //         val lowerLeftmostNode = remove_(down, k)
-  //         removeRight(t, k, lowerLeftmostNode)
-  //       }
-  //       case Leaf => Leaf // Found a leaf (we are at level -1)
-  //     }
-  //   }
+  def remove(sl: SkipList, k: Int): SkipList = {
+    require(isSkipList(sl))
+    require(k != Int.MinValue)
+    def remove_(t: Node, k: Int): Node = {
+      require(isSkipList(t))
+      require(size(t) >= 0)
+      decreases(size(t))
+      t match { // Returns the list with k removed
+        case t@SkipNode(value, down, right, height) => {
+          sizeDecreasesDown(t)
+          sizeIsNonNegative(down)
+          val lowerLeftmostNode = remove_(down, k)
+          sizeIsNonNegative(t)
+          assert(isSkipList(lowerLeftmostNode)) // TODO : prove remove_ returns valid skiplist node
+          removeRight(t, k, lowerLeftmostNode)
+        }
+        case Leaf => Leaf // Found a leaf (we are at level -1)
+      }
+    }
 
-  //   def removeRight(t: Node, k: Int, lowerLevel: Node): Node = {
-  //     require(isSkipList(t))
-  //     require(isSkipList(lowerLevel))
-  //     decreases(size(t))
-  //     t match {
-  //       case t@SkipNode(value, down, right, height) => {
-  //         val newDown = findNewDown(lowerLevel, value)
-  //         right match {
-  //           case SkipNode(valueR, downR, rightR, heightR) => {
-  //             if (valueR == k) { // Remove right
-  //               sizeDecreasesToTheRight(t)
-  //               val hope = removeRight(rightR, k, newDown)
-  //               SkipNode(value, newDown, hope, height)
-  //             }
-  //             else { // Value is not the next node, just recurse to the right
-  //               sizeDecreasesToTheRight(t)
-  //               val hope = removeRight(right, k, newDown)
-  //               SkipNode(value, newDown, hope, height)
-  //             }
-  //           }
-  //           case Leaf => SkipNode(value, newDown, Leaf, height) // Reached end of this level, just update lower node
-  //         }
-  //       }
-  //       case Leaf => Leaf
-  //     }
-  //   }
+    def removeRight(t: Node, k: Int, lowerLevel: Node): Node = {
+      require(isSkipList(t))
+      require(isSkipList(lowerLevel))
+      require(size(t) >= 0)
+      decreases(size(t))
+      sizeIsNonNegative(t)
+      t match {
+        case t@SkipNode(value, down, right, height) => {
+          val newDown = findNewDown(lowerLevel, value)
+          newDownReturnsValidElement(lowerLevel, value)
+          right match {
+            case SkipNode(valueR, downR, rightR, heightR) => {
+              if (valueR == k) { // Remove right
+                assert(isInRightSubtree(rightR, t))
+                nodeHeightIsNonNegative(t)
+                sizeAtRightIsLower(t, rightR)
+                sizeIsNonNegative(rightR)
+                SkipNode(value, newDown, removeRight(rightR, k, newDown), height)
+              }
+              else { // Value is not the next node, just recurse to the right
+                sizeDecreasesToTheRight(t)
+                sizeIsNonNegative(right)
+                SkipNode(value, newDown, removeRight(right, k, newDown), height)
+              }
+            }
+            case Leaf => SkipNode(value, newDown, Leaf, height) // Reached end of this level, just update lower node
+          }
+        }
+        case Leaf => Leaf
+      }
+    }
 
-  //   SkipList(remove_(sl.head, k), sl.maxHeight)
-  // }
-
+    sizeIsNonNegative(sl.head)
+    SkipList(remove_(sl.head, k), sl.maxHeight)
+  }
   
   // def isIn(sl: SkipList, k: Int): Boolean = {
   //   search(sl, k) match {
@@ -527,6 +537,10 @@ object SkipList {
     }
   } ensuring (_ => size(n) > size(n.right))
 
+  def sizeDecreasesDown(n: SkipNode): Unit = {
+    sizeRightIsNonNegative(n.right)
+  } ensuring (_ => size(n) > size(n.down))
+
   def assume(b: Boolean): Unit = {
 
   } ensuring (_ => b)
@@ -545,6 +559,19 @@ object SkipList {
     case SkipNode(value, down, right, height) => 1 + sizeRight(right)
     case Leaf => 0
   }
+
+  // Auxiliary lemmas used to validate SkipList methods
+  def newDownReturnsValidElement(t: Node, v: Int): Unit = {
+    require(isSkipList(t))
+    t match {
+      case t@SkipNode(value, _, right, _) => {
+        if (value != v) {
+          newDownReturnsValidElement(right, v)
+        }
+      }
+      case Leaf => ()
+    }
+  } ensuring (_ => isSkipList(findNewDown(t, v)))
 
 
   //_________________________________________________________TESTING___________________________________________________
