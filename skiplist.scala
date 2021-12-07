@@ -297,7 +297,7 @@ object SkipList {
   // If sl is skiplist and insert element then result is also skiplist and search returns Some(x)
   // If search element in the list, it is found x
   // If remove then search, not found x
-  // Every level is a subset of the level below
+  // If isSkipList, every level is a subset of the level below
   // Search is probabilistically log
 
 /*
@@ -526,7 +526,7 @@ object SkipList {
     }
   } ensuring (_ => !isInRightSubtree(x, n))
 
-  def isInRightSubtreeAntiReflexive(n: Node, x: Node): Unit = {
+  def isInRightSubtreeAntiReflexive(n: Node, x: Node): Unit = { // TODO : Finish this proof. Might require transifivity of isNotInRightSubtree
     require(isSkipList(n))
     require(isSkipList(x))
     require(isInRightSubtree(x, n))
@@ -579,7 +579,7 @@ object SkipList {
     require(isSkipList(n))
     require(isSkipList(x))
     require(isInRightSubtree(x, n))
-    decreases(rightDistance(n) - rightDistance(x))
+    decreases(rightDistance(n) - rightDistance(x)) // TODO : Prove that measure decreases and is non-negative when x is in n's right subtree
     n match {
       case SkipNode(_, down, right, _) => right match {
         case right@SkipNode(_, downR, _, _) => {
