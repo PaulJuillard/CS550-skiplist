@@ -35,50 +35,58 @@ object SkipList {
   }
 
   // def insert(sl: SkipList, k: Int, height: Int): SkipList = {
-  //   require(height>=0)
-  //   val newHeight = min(sl.maxHeight + 1, height) // TODO : Check that this makes sense
+  //   require(height >= 0)
+  //   val newHeight = height
+  //   // val newHeight = min(sl.maxHeight + 1, height) // TODO : Check that this makes sense
 
-  //   def insert_(t: Node, k: Int, insertHeight: Int): Node = t match { // Returns the list with k inserted
-  //     case SkipNode(value, down, right, height) => {
-  //       if (height > insertHeight) { // We are too high, recurse on lower level
-  //         SkipNode(value, insert_(down, k, insertHeight), right, height)
+  //   def insert_(t: Node, k: Int, insertHeight: Int): Node = {
+  //     decreases(size(t))
+  //     t match { // Returns the list with k inserted
+  //       case SkipNode(value, down, right, height) => {
+  //         if (height > insertHeight) { // We are too high, recurse on lower level
+  //           SkipNode(value, insert_(down, k, insertHeight), right, height)
+  //         }
+  //         else {
+  //           val lowerLeftmostNode = insert_(down, k, insertHeight)
+  //           insertRight(t, k, lowerLeftmostNode)
+  //         }
   //       }
-  //       else {
-  //         val lowerLeftmostNode = insert_(down, k, insertHeight)
-  //         insertRight(t, k, lowerLeftmostNode)
-  //       }
+  //       case Leaf => Leaf // Found a leaf (we are at level -1)
   //     }
-  //     case Leaf => Leaf // Found a leaf (we are at level -1)
   //   }
 
-  //   def insertRight(t: Node, k: Int, lowerLevel: Node): Node = t match {
-  //     case SkipNode(value, down, right, height) => {
-  //       val newDown = findNewDown(lowerLevel, value)
-  //       right match {
-  //         case SkipNode(valueR, downR, rightR, heightR) => {
-  //           if ((valueR <= k) || (value >= k)) { // Key must be inserted further to the right, or we have passed the insertion point, simply update down
-  //             SkipNode(value, newDown, insertRight(right, k, newDown), height)
+  //   def insertRight(t: Node, k: Int, lowerLevel: Node): Node = {
+  //     decreases(size(t))
+  //     t match {
+  //       case SkipNode(value, down, right, height) => {
+  //         val newDown = findNewDown(lowerLevel, value)
+  //         right match {
+  //           case SkipNode(valueR, downR, rightR, heightR) => {
+  //             if ((valueR <= k) || (value >= k)) { // Key must be inserted further to the right, or we have passed the insertion point, simply update down
+  //               SkipNode(value, newDown, insertRight(right, k, newDown), height)
+  //             }
+  //             else { // Insert to the right
+  //               val insertedNode = SkipNode(k, Leaf, right, height) 
+  //               SkipNode(value, newDown, insertRight(insertedNode, k, newDown), height)
+  //             }
   //           }
-  //           else { // Insert to the right
-  //             val insertedNode = SkipNode(k, Leaf, right, height) 
-  //             SkipNode(value, newDown, insertRight(insertedNode, k, newDown), height)
-  //           }
-  //         }
-  //         case Leaf => { // Reached end of list, we insert to the right if the current value is less than k
-  //           if (value < k) { // Insert to the right
-  //             val insertedNode = SkipNode(k, Leaf, Leaf, height) 
-  //             SkipNode(value, newDown, insertRight(insertedNode, k, newDown), height)
-  //           }
-  //           else { // Just update down
-  //             SkipNode(value, newDown, Leaf, height)
+  //           case Leaf => { // Reached end of list, we insert to the right if the current value is less than k
+  //             if (value < k) { // Insert to the right
+  //               val insertedNode = SkipNode(k, Leaf, Leaf, height) 
+  //               SkipNode(value, newDown, insertRight(insertedNode, k, newDown), height)
+  //             }
+  //             else { // Just update down
+  //               SkipNode(value, newDown, Leaf, height)
+  //             }
   //           }
   //         }
   //       }
+  //       case Leaf => Leaf
   //     }
-  //     case Leaf => Leaf
   //   }
 
   //   def increaseHeight(t: Node, newHeight: Int): Node = {
+  //     decreases(newHeight - height)
   //     t match {
   //       case SkipNode(value, down, right, height) => 
   //         if (height >= newHeight) {
@@ -166,12 +174,12 @@ object SkipList {
     SkipList(remove_(sl.head, k), sl.maxHeight)
   }
   
-  // def isIn(sl: SkipList, k: Int): Boolean = {
-  //   search(sl, k) match {
-  //     case None() => false
-  //     case Some(value) => true
-  //   }
-  // }
+  def isIn(sl: SkipList, k: Int): Boolean = {
+    search(sl, k) match {
+      case None() => false
+      case Some(value) => true
+    }
+  }
 
  //__________________________________________________________AXIOMS______________________________________________________
   /* SkipList structural properties. They all must also be true recursively for the down and right nodes except the last one
@@ -309,31 +317,41 @@ object SkipList {
   // If search element in the list, it is found x
   // If remove then search, not found x
   // If isSkipList, every level is a subset of the level below
-  // Search is probabilistically log
+  // Search is probabilistically log : tr0 dur j'ai peur 
 
-/*
-  def inv_inserted_found(sl:SkipList, k: Int):Unit = {
-    //TODO change hardcoded 0
-  }.ensuring(_=> search(insert_h(sl, k, 0), k) == Some(k))
+  // New propositions : Splitting some properties, and define the notion of "being in the list"
+  // Def - Element is in the list if it is in the right subtree of first element, or in the list of element just below
+  // 0 - If sl is a skiplist and a is in the right subtree of node, then a.down is in the right subtree of node.down (and a.down.value == a.value) (kinda proved already)
+  // 1 - If sl is a skiplist, insert(sl, a) is also a skiplist
+  // 2 - If sl is a skiplist, remove(sl, a) is also a skiplist
+  // 3 - If sl is a skiplist, insert(sl, a) contains a
+  // 4 - If sl is a skiplist, remove(sl, a) contains a
+  // 5 - If sl is a skiplist and b is in sl, insert(sl, a) contains b
+  // 6 - If sl is a skiplist and b is in sl, remove(sl, a != b) contains b
+  // 7 - If sl is a skiplist and a is in sl, search(sl, a) returns Some(a)
+  // 8 - If sl is a skiplist and a is not in sl, search(sl, a) returns None
 
-  def inv_isin_search(sl: SkipList, k: Int): Unit = {
-    //can distinguish cases if needed
-  }.ensuring(_=> isIn(sl, k) == (search(sl, k) == Some(k)))
+  // def inv_inserted_found(sl:SkipList, k: Int):Unit = {
+  //   //TODO change hardcoded 0
+  // }.ensuring(_=> search(insert_h(sl, k, 0), k) == Some(k))
 
-  def inv_remove_notfound(sl:SkipList, k:Int) : Unit = {
-  }.ensuring(_ => !isin(remove(sl, k)))
-*/
-  /*
-  def level(sl: SkipList, h: Int): Set[Int]{
-    require(h>=0)
-    //go bfs
-    def level(t: Node, h: Int, acc: Set[Int]): Set[Int] = t match {
-      case Node(value, down, right, height) =>
-        if(height > h) =>
+  // def inv_isin_search(sl: SkipList, k: Int): Unit = {
+  //   //can distinguish cases if needed
+  // }.ensuring(_=> isIn(sl, k) == (search(sl, k) == Some(k)))
 
-    }
-  }
-  */
+  // def inv_remove_notfound(sl:SkipList, k:Int) : Unit = {
+  // }.ensuring(_ => !isin(remove(sl, k)))
+  
+  // def level(sl: SkipList, h: Int): Set[Int]{
+  //   require(h>=0)
+  //   //go bfs
+  //   def level(t: Node, h: Int, acc: Set[Int]): Set[Int] = t match {
+  //     case Node(value, down, right, height) =>
+  //       if(height > h) =>
+
+  //   }
+  // }
+  
   //_________________________________________________________LEMMAS____________________________________________________
   def elementOfSkipListIsSkipList(t: SkipNode): Unit = { // Is not used in proofs, but keep it there to make sure we don't break SkipList axioms
     require(isSkipList(t))
@@ -576,71 +594,70 @@ object SkipList {
 
   //_________________________________________________________TESTING___________________________________________________
 
-/*
-  @ignore
-  def printList(sl: SkipList): Unit = {
-    def printLevel(t: Node): Unit = t match {
-      case Leaf => println("+inf]")
-      case SkipNode(value, down, right, height) => {
-        if (value == Int.MinValue) {
-          print("[" + value + ", ")
-        }
-        else {
-          print(value + ", ")
-        }
-        printLevel(right)
-      }
-    }
-    def printList_(t: Node): Unit = t match {
-      case Leaf => println()
-      case SkipNode(value, down, right, height) => {printLevel(t); printList_(down)}
-    }
-    printList_(sl.head)
-  }
+
+  // @ignore
+  // def printList(sl: SkipList): Unit = {
+  //   def printLevel(t: Node): Unit = t match {
+  //     case Leaf => println("+inf]")
+  //     case SkipNode(value, down, right, height) => {
+  //       if (value == Int.MinValue) {
+  //         print("[" + value + ", ")
+  //       }
+  //       else {
+  //         print(value + ", ")
+  //       }
+  //       printLevel(right)
+  //     }
+  //   }
+  //   def printList_(t: Node): Unit = t match {
+  //     case Leaf => println()
+  //     case SkipNode(value, down, right, height) => {printLevel(t); printList_(down)}
+  //   }
+  //   printList_(sl.head)
+  // }
 
   
-  @ignore
-  def randomAction(rd: Random, sl: SkipList, upperBoundElems: Int): SkipList = {
-    val elem = rd.nextInt(upperBoundElems)
-    rd.nextInt(3) match {
-      case 0 => {
-        println("Searching for " + elem)
-        if (isIn(sl, elem)) {
-          println("Found")
-        }
-        else {
-          println("Not found")
-        }
-        println()
-        sl
-      }
-      case 1 => {
-        println("Inserting " + elem)
-        val resultList = insert(sl, elem)
-        printList(resultList)
-        resultList
-      }
-      case 2 => {
-        println("Removing " + elem)
-        val resultList = remove(sl, elem)
-        printList(resultList)
-        resultList
-      }
-    }
-  }
+  // @ignore
+  // def randomAction(rd: Random, sl: SkipList, upperBoundElems: Int): SkipList = {
+  //   val elem = rd.nextInt(upperBoundElems)
+  //   rd.nextInt(3) match {
+  //     case 0 => {
+  //       println("Searching for " + elem)
+  //       if (isIn(sl, elem)) {
+  //         println("Found")
+  //       }
+  //       else {
+  //         println("Not found")
+  //       }
+  //       println()
+  //       sl
+  //     }
+  //     case 1 => {
+  //       println("Inserting " + elem)
+  //       val resultList = insert(sl, elem)
+  //       printList(resultList)
+  //       resultList
+  //     }
+  //     case 2 => {
+  //       println("Removing " + elem)
+  //       val resultList = remove(sl, elem)
+  //       printList(resultList)
+  //       resultList
+  //     }
+  //   }
+  // }
 
-  @ignore
-  def initSL(): SkipList = {
-    val firstNode = SkipNode(Int.MinValue, Leaf, Leaf, 0)
-    return SkipList(firstNode, 0)
-  }
-  @ignore
-  def main(args: Array[String]): Unit = {
-    val nOps = 50
-    val upperBoundElems = 100
-    val r = new Random
-    val sl = initSL()
-    (0 until nOps).foldLeft(sl)((tmpList, _) => randomAction(r, tmpList, upperBoundElems))
-  }
-  */
+  // @ignore
+  // def initSL(): SkipList = {
+  //   val firstNode = SkipNode(Int.MinValue, Leaf, Leaf, 0)
+  //   return SkipList(firstNode, 0)
+  // }
+  // @ignore
+  // def main(args: Array[String]): Unit = {
+  //   val nOps = 50
+  //   val upperBoundElems = 100
+  //   val r = new Random
+  //   val sl = initSL()
+  //   (0 until nOps).foldLeft(sl)((tmpList, _) => randomAction(r, tmpList, upperBoundElems))
+  // }
 }
