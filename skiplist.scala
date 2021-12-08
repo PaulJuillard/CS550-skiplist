@@ -3,7 +3,6 @@ import stainless.lang._
 import stainless.annotation._
 import stainless.collection._
 
-
 object SkipList {
   sealed abstract class Node
   case class SkipList(head: Node, maxHeight: Int)
@@ -34,84 +33,87 @@ object SkipList {
     search_(sl.head, target)
   }
 
-  // def insert(sl: SkipList, k: Int, height: Int): SkipList = {
-  //   require(height >= 0)
-  //   val newHeight = height
-  //   // val newHeight = min(sl.maxHeight + 1, height) // TODO : Check that this makes sense
+  def insert(t: Node, k: Int, insertHeight: Int): Node = {
+    require(isSkipList(t))
+    require(insertHeight >= 0)
+    
+    decreases(size(t))
+    t match { // Returns the list with k inserted
+      case SkipNode(value, down, right, height) => {
+        if (height > insertHeight) { // We are too high, recurse on lower level
+          SkipNode(value, insert_(down, k, insertHeight), right, height)
+        }
+        else {
+          val lowerLeftmostNode = insert_(down, k, insertHeight)
+          insertRight(t, k, lowerLeftmostNode)
+        }
+      }
+      case Leaf => Leaf // Found a leaf (we are at level -1)
+    }
+  }
 
-  //   def insert_(t: Node, k: Int, insertHeight: Int): Node = {
-  //     decreases(size(t))
-  //     t match { // Returns the list with k inserted
-  //       case SkipNode(value, down, right, height) => {
-  //         if (height > insertHeight) { // We are too high, recurse on lower level
-  //           SkipNode(value, insert_(down, k, insertHeight), right, height)
-  //         }
-  //         else {
-  //           val lowerLeftmostNode = insert_(down, k, insertHeight)
-  //           insertRight(t, k, lowerLeftmostNode)
-  //         }
-  //       }
-  //       case Leaf => Leaf // Found a leaf (we are at level -1)
-  //     }
-  //   }
+  def insertRight(t: Node, k: Int, lowerLevel: Node): Node = {
+    decreases(size(t))
+    t match {
+      case SkipNode(value, down, right, height) => {
+        val newDown = findNewDown(lowerLevel, value)
+        right match {
+          case SkipNode(valueR, downR, rightR, heightR) => {
+            if ((valueR <= k) || (value >= k)) { // Key must be inserted further to the right, or we have passed the insertion point, simply update down
+              SkipNode(value, newDown, insertRight(right, k, newDown), height)
+            }
+            else { // Insert to the right
+              val insertedNode = SkipNode(k, Leaf, right, height) 
+              SkipNode(value, newDown, insertRight(insertedNode, k, newDown), height)
+            }
+          }
+          case Leaf => { // Reached end of list, we insert to the right if the current value is less than k
+            if (value < k) { // Insert to the right
+              val insertedNode = SkipNode(k, Leaf, Leaf, height) 
+              SkipNode(value, newDown, insertRight(insertedNode, k, newDown), height)
+            }
+            else { // Just update down
+              SkipNode(value, newDown, Leaf, height)
+            }
+          }
+        }
+      }
+      case Leaf => Leaf
+    }
+  }
 
-  //   def insertRight(t: Node, k: Int, lowerLevel: Node): Node = {
-  //     decreases(size(t))
-  //     t match {
-  //       case SkipNode(value, down, right, height) => {
-  //         val newDown = findNewDown(lowerLevel, value)
-  //         right match {
-  //           case SkipNode(valueR, downR, rightR, heightR) => {
-  //             if ((valueR <= k) || (value >= k)) { // Key must be inserted further to the right, or we have passed the insertion point, simply update down
-  //               SkipNode(value, newDown, insertRight(right, k, newDown), height)
-  //             }
-  //             else { // Insert to the right
-  //               val insertedNode = SkipNode(k, Leaf, right, height) 
-  //               SkipNode(value, newDown, insertRight(insertedNode, k, newDown), height)
-  //             }
-  //           }
-  //           case Leaf => { // Reached end of list, we insert to the right if the current value is less than k
-  //             if (value < k) { // Insert to the right
-  //               val insertedNode = SkipNode(k, Leaf, Leaf, height) 
-  //               SkipNode(value, newDown, insertRight(insertedNode, k, newDown), height)
-  //             }
-  //             else { // Just update down
-  //               SkipNode(value, newDown, Leaf, height)
-  //             }
-  //           }
-  //         }
-  //       }
-  //       case Leaf => Leaf
-  //     }
-  //   }
+  def insert(sl: SkipList, k: Int, height: Int): SkipList = {
+    require(height >= 0)
 
-  //   def increaseHeight(t: Node, newHeight: Int): Node = {
-  //     decreases(newHeight - height)
-  //     t match {
-  //       case SkipNode(value, down, right, height) => 
-  //         if (height >= newHeight) {
-  //           t
-  //         } 
-  //         else {
-  //           increaseHeight(SkipNode(value, t, Leaf, height+1), newHeight)
-  //         }
-  //       case Leaf => Leaf
-  //     }
-  //   }
+    def increaseHeight(t: Node, newHeight: Int): Node = {
+       decreases(newHeight - height)
+       t match {
+         case SkipNode(value, down, right, height) => 
+           if (height >= newHeight) {
+             t
+           } 
+           else {
+             increaseHeight(SkipNode(value, t, Leaf, height+1), newHeight)
+           }
+         case Leaf => Leaf
+       }
+     }
 
-  //   SkipList(insert_(increaseHeight(sl.head, newHeight), k, newHeight), max(sl.maxHeight, height)) 
-  // }
+     SkipList(insert_(increaseHeight(sl.head, newHeight), k, newHeight), max(sl.maxHeight, height)) 
+   }
 
-  // def insert(sl: SkipList, k: Int): SkipList = {
-  //   if (isIn(sl, k)) {
-  //     sl
-  //   }
-  //   def getRandomLevel(rd: Random, acc: Int): Int = {if (rd.nextInt(2) == 0) {acc} else {getRandomLevel(rd, acc+1)}}
-  //   val r = new Random
-  //   val height = getRandomLevel(r, 0)
-  //   //println("random height : " + height)
-  //   insert(sl, k, height)
-  // }
+  /*def
+  insert(sl: SkipList, k: Int): SkipList = {
+     if (isIn(sl, k)) {
+       sl
+     }
+     def getRandomLevel(rd: Random, acc: Int): Int = {if (rd.nextInt(2) == 0) {acc} else {getRandomLevel(rd, acc+1)}}
+     val r = new Random
+     val height = getRandomLevel(r, 0)
+     //println("random height : " + height)
+     insert(sl, k, height)
+  }
+  */
 
   def findNewDown(t: Node, v: Int): Node = t match {
     case SkipNode(value, down, right, height) => if (value == v) {t} else {findNewDown(right, v)}
