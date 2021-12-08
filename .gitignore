@@ -11,3 +11,6 @@ sbt.json
 .bsp/
 target/
 project/
+.bloop/*
+stainless-stack-trace.txt
+vccache.bin
