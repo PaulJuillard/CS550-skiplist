@@ -123,59 +123,60 @@ object SkipList {
   def remove(sl: SkipList, k: Int): SkipList = {
     require(isSkipList(sl))
     require(k != Int.MinValue)
-    def remove_(t: Node, k: Int): Node = {
-      require(isSkipList(t))
-      require(size(t) >= 0)
-      decreases(size(t))
-      t match { // Returns the list with k removed
-        case t@SkipNode(value, down, right, height) => {
-          sizeDecreasesDown(t)
-          sizeIsNonNegative(down)
-          val lowerLeftmostNode = remove_(down, k)
-          sizeIsNonNegative(t)
-          assert(isSkipList(lowerLeftmostNode)) // TODO : prove remove_ returns valid skiplist node
-          removeRight(t, k, lowerLeftmostNode)
-        }
-        case Leaf => Leaf // Found a leaf (we are at level -1)
-      }
-    }
-
-    def removeRight(t: Node, k: Int, lowerLevel: Node): Node = {
-      require(isSkipList(t))
-      require(isSkipList(lowerLevel))
-      require(size(t) >= 0)
-      decreases(size(t))
-      sizeIsNonNegative(t)
-      t match {
-        case t@SkipNode(value, down, right, height) => {
-          val newDown = findNewDown(lowerLevel, value)
-          newDownReturnsValidElement(lowerLevel, value)
-          right match {
-            case SkipNode(valueR, downR, rightR, heightR) => {
-              if (valueR == k) { // Remove right
-                assert(isInRightSubtree(rightR, t))
-                nodeHeightIsNonNegative(t)
-                sizeAtRightIsLower(t, rightR)
-                sizeIsNonNegative(rightR)
-                SkipNode(value, newDown, removeRight(rightR, k, newDown), height)
-              }
-              else { // Value is not the next node, just recurse to the right
-                sizeDecreasesToTheRight(t)
-                sizeIsNonNegative(right)
-                SkipNode(value, newDown, removeRight(right, k, newDown), height)
-              }
-            }
-            case Leaf => SkipNode(value, newDown, Leaf, height) // Reached end of this level, just update lower node
-          }
-        }
-        case Leaf => Leaf
-      }
-    }
-
     sizeIsNonNegative(sl.head)
-    SkipList(remove_(sl.head, k), sl.maxHeight)
+    SkipList(remove(sl.head, k), sl.maxHeight)
+  }
+
+  def remove(t: Node, k: Int): Node = {
+    require(isSkipList(t))
+    require(size(t) >= 0)
+    decreases(size(t))
+    t match { // Returns the list with k removed
+      case t@SkipNode(value, down, right, height) => {
+        sizeDecreasesDown(t)
+        sizeIsNonNegative(down)
+        val lowerLeftmostNode = remove(down, k)
+        sizeIsNonNegative(t)
+        removeReturnsSkipList(down, k)
+        // assert(isSkipList(lowerLeftmostNode)) // TODO : prove remove returns valid skiplist node
+        removeRight(t, k, lowerLeftmostNode)
+      }
+      case Leaf => Leaf // Found a leaf (we are at level -1)
+    }
   }
   
+  def removeRight(t: Node, k: Int, lowerLevel: Node): Node = {
+    require(isSkipList(t))
+    require(isSkipList(lowerLevel))
+    require(size(t) >= 0)
+    decreases(size(t))
+    sizeIsNonNegative(t)
+    t match {
+      case t@SkipNode(value, down, right, height) => {
+        val newDown = findNewDown(lowerLevel, value)
+        newDownReturnsValidElement(lowerLevel, value)
+        right match {
+          case SkipNode(valueR, downR, rightR, heightR) => {
+            if (valueR == k) { // Remove right
+              assert(isInRightSubtree(rightR, t))
+              nodeHeightIsNonNegative(t)
+              sizeAtRightIsLower(t, rightR)
+              sizeIsNonNegative(rightR)
+              SkipNode(value, newDown, removeRight(rightR, k, newDown), height)
+            }
+            else { // Value is not the next node, just recurse to the right
+              sizeDecreasesToTheRight(t)
+              sizeIsNonNegative(right)
+              SkipNode(value, newDown, removeRight(right, k, newDown), height)
+            }
+          }
+          case Leaf => SkipNode(value, newDown, Leaf, height) // Reached end of this level, just update lower node
+        }
+      }
+      case Leaf => Leaf
+    }
+  }
+
   def isIn(sl: SkipList, k: Int): Boolean = {
     search(sl, k) match {
       case None() => false
@@ -327,11 +328,21 @@ object SkipList {
   // 1 - If sl is a skiplist, insert(sl, a) is also a skiplist
   // 2 - If sl is a skiplist, remove(sl, a) is also a skiplist
   // 3 - If sl is a skiplist, insert(sl, a) contains a
-  // 4 - If sl is a skiplist, remove(sl, a) contains a
+  // 4 - If sl is a skiplist, remove(sl, a) doesn't contain a
   // 5 - If sl is a skiplist and b is in sl, insert(sl, a) contains b
   // 6 - If sl is a skiplist and b is in sl, remove(sl, a != b) contains b
   // 7 - If sl is a skiplist and a is in sl, search(sl, a) returns Some(a)
   // 8 - If sl is a skiplist and a is not in sl, search(sl, a) returns None
+
+  // Proof of property 2 :
+  def removeReturnsSkipList(n: Node, k: Int): Unit = { // TODO
+    decreases(size(n)) // Bad measure, just here for compilation
+    require(isSkipList(n))
+  } ensuring (_ => isSkipList(remove(n, k)))
+
+  def removeReturnsSkipList(sl: SkipList, k: Int): Unit = { // TODO : This is property 2
+    require(isSkipList(sl))
+  } ensuring (_ => isSkipList(remove(sl, k)))
 
   // def inv_inserted_found(sl:SkipList, k: Int):Unit = {
   //   //TODO change hardcoded 0
