@@ -325,7 +325,7 @@ object SkipList {
   // 1 - If sl is a skiplist, insert(sl, a) is also a skiplist
   // 2 - If sl is a skiplist, remove(sl, a) is also a skiplist
   // 3 - If sl is a skiplist, insert(sl, a) contains a
-  // 4 - If sl is a skiplist, remove(sl, a) contains a
+  // 4 - If sl is a skiplist, remove(sl, a) doesn't contain a
   // 5 - If sl is a skiplist and b is in sl, insert(sl, a) contains b
   // 6 - If sl is a skiplist and b is in sl, remove(sl, a != b) contains b
   // 7 - If sl is a skiplist and a is in sl, search(sl, a) returns Some(a)
