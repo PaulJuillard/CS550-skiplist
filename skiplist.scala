@@ -3,7 +3,6 @@ import stainless.lang._
 import stainless.annotation._
 import stainless.collection._
 
-
 object SkipList {
   sealed abstract class Node
   case class SkipList(head: Node, maxHeight: Int)
@@ -117,6 +116,7 @@ object SkipList {
     case Leaf => Leaf
   }
 
+/*
   def remove(sl: SkipList, k: Int): SkipList = {
     require(isSkipList(sl))
     require(k != Int.MinValue)
@@ -134,7 +134,7 @@ object SkipList {
         sizeIsNonNegative(down)
         val lowerLeftmostNode = remove(down, k)
         sizeIsNonNegative(t)
-        removeReturnsSkipList(down, k)
+        //removeReturnsSkipList(down, k)
         // assert(isSkipList(lowerLeftmostNode)) // TODO : prove remove returns valid skiplist node
         removeRight(t, k, lowerLeftmostNode)
       }
@@ -173,7 +173,7 @@ object SkipList {
       case Leaf => Leaf
     }
   }
-
+*/
   def isIn(sl: SkipList, k: Int): Boolean = {
     search(sl, k) match {
       case None() => false
@@ -181,7 +181,7 @@ object SkipList {
     }
   }
 
- //__________________________________________________________AXIOMS______________________________________________________
+//__________________________________________________________AXIOMS______________________________________________________
   /* SkipList structural properties. They all must also be true recursively for the down and right nodes except the last one
   - heights >= 0
 
@@ -346,14 +346,14 @@ object SkipList {
   //_________________________________________________________INVARIANTS____________________________________________________
   
   // 0 - If sl is a skiplist and a is in the right subtree of node, then a.down is in the right subtree of node.down (and a.down.value == a.value) (kinda proved already)
-  def lowerLevelIsSupersetofHigherOne(n: SkipNode, x: SkipNode): Unit = {
+  def higherLevelIsSubsetofLowerOne(n: SkipNode, x: SkipNode): Unit = {
     require(isSkipList(n))
     require(isSkipList(x))
     require(isInRightSubtree(x, n))
     if (n.right != x) {
       n.right match {
         case r@SkipNode(_, _, _, _) => {
-          lowerLevelIsSupersetofHigherOne(r, x)
+          higherLevelIsSubsetofLowerOne(r, x)
           (n.down, r.down, x.down) match {
             case (nD@SkipNode(_, _, _, _), rD@SkipNode(_, _, _, _), xD@SkipNode(_, _, _, _)) => isInRightSubtreeTransitive(nD, rD, xD)
             case _ => ()
@@ -362,98 +362,132 @@ object SkipList {
       }
     }
   } ensuring (_ => isInRightSubtree(x.down, n.down))
+
   
   // 1 - If sl is a skiplist, insert(sl, a) is also a skiplist ==============
-  def insertReturnsSkiplist(sl : SkipList, v: Int, height: Int): Unit = {
-    require(isSkipList(sl))
-    require(height>=0)
-    
-  } ensuring (_ => isSkipList(insert(sl,v,height)))
-
-  def insertReturnsSkiplist(n : Node, v: Int, height: Int): Unit = {
-    require(isSkipList(n))
-    require(height>=0)
-    
-  } ensuring (_ => isSkipList(insert(n,v,height)))
-  
-  // 2 - If sl is a skiplist, remove(sl, a) is also a skiplist ==============
-  def insertReturnsSkiplist(sl : SkipList, v: Int): Unit = {
-    require(isSkipList(sl))
-    
-  } ensuring (_ => isSkipList(remove(sl,v)))
-
-  def insertReturnsSkiplist(n : Node, v: Int): Unit = {
-    require(isSkipList(n))
-    
-  } ensuring (_ => isSkipList(remove(n,v)))
-
-  // 3 - If sl is a skiplist, insert(sl, a) contains a ======================
-  def insertReallyInserts(sl: SkipList, v: Int, height: Int): Unit = {
-    require(isSkipList(sl))
-    require(height>=0)
-  } ensuring (_ => isInTheList(v,insert(sl,v,height)))
-
-  def insertReallyInserts(n: Node, v: Int, height: Int): Unit = {
-    require(isSkipList(n))
-    require(height>=0)
-  } ensuring (_ => isInTheList(v,insert(n,v,height)))
-
-  // 4 - If sl is a skiplist, remove(sl, a) does not contains a =============
-  def removeReallyRemoves(sl: SkipList, v: Int): Unit = {
-    require(isSkipList(sl))
-  } ensuring (_ => !isInTheList(v,remove(sl,v)))
-
-  def removeReallyRemoves(n: Node, v: Int): Unit = {
-    require(isSkipList(n))
-  } ensuring (_ => !isInTheList(v,remove(n,v)))
-
-  // 5 - If sl is a skiplist and b is in sl, insert(sl, a) contains b =======
-  def insertDoesNotRemoveElements(sl: SkipList, a: Int, height: Int, b: Int): Unit = {
-    require(isSkipList(sl))
-    require(height>=0)
-    require(isInTheList(b,sl))
-  } ensuring (_ => isInTheList(b,insert(sl,a,height)))
-
-  def insertDoesNotRemoveElements(n: Node, a: Int, height: Int, b: Int): Unit = {
-    require(isSkipList(n))
-    require(height>=0)
-    require(isInTheList(b,n))
-  } ensuring (_ => isInTheList(b,insert(n,a,height)))
-
-  // 6 - If sl is a skiplist and b is in sl, remove(sl, a != b) contains b ===
-  def removeDoesNotRemoveOtherElements(sl: SkipList, a: Int, b: Int): Unit = {
-    require(isSkipList(sl))
-    require(isInTheList(b,sl))
-  } ensuring (_ => isInTheList(b,remove(sl,a)))
-  
-  def removeDoesNotRemoveOtherElements(n: Node, a: Int, b: Int): Unit = {
-    require(isSkipList(n))
-    require(isInTheList(b,n))
-  } ensuring (_ => isInTheList(b,remove(n,a)))
-
-  // 7 - If sl is a skiplist and a is in sl, search(sl, a) returns Some(a) ===
-  def searchFindsElement(sl: SkipList, v: Int): Unit = {
-    require(isSkipList(sl))
-    require(isInTheList(v,sl))
-  } ensuring (_ => search(sl,v) == Some(v))
-
-  def searchFindsElement(n: Node, v: Int): Unit = {
-    require(isSkipList(n))
-    require(isInTheList(v,n))
-  } ensuring (_ => search(n,v) == Some(v))
+//  def insertReturnsSkiplist(sl : SkipList, v: Int, height: Int): Unit = {
+//    require(isSkipList(sl))
+//    require(height>=0)
+//    
+//  } ensuring (_ => isSkipList(insert(sl,v,height)))
+//
+//  def insertReturnsSkiplist(n : Node, v: Int, height: Int): Unit = {
+//    require(isSkipList(n))
+//    require(height>=0)
+//    
+//  } ensuring (_ => isSkipList(insert(n,v,height)))
+//  
+//  // 2 - If sl is a skiplist, remove(sl, a) is also a skiplist ==============
+//  def insertReturnsSkiplist(sl : SkipList, v: Int): Unit = {
+//    require(isSkipList(sl))
+//    
+//  } ensuring (_ => isSkipList(remove(sl,v)))
+//
+//  def insertReturnsSkiplist(n : Node, v: Int): Unit = {
+//    require(isSkipList(n))
+//    
+//  } ensuring (_ => isSkipList(remove(n,v)))
+//
+//  // 3 - If sl is a skiplist, insert(sl, a) contains a ======================
+//  def insertReallyInserts(sl: SkipList, v: Int, height: Int): Unit = {
+//    require(isSkipList(sl))
+//    require(height>=0)
+//  } ensuring (_ => isInTheList(v,insert(sl,v,height)))
+//
+//  def insertReallyInserts(n: Node, v: Int, height: Int): Unit = {
+//    require(isSkipList(n))
+//    require(height>=0)
+//  } ensuring (_ => isInTheList(v,insert(n,v,height)))
+//
+//  // 4 - If sl is a skiplist, remove(sl, a) does not contains a =============
+//  def removeReallyRemoves(sl: SkipList, v: Int): Unit = {
+//    require(isSkipList(sl))
+//  } ensuring (_ => !isInTheList(v,remove(sl,v)))
+//
+//  def removeReallyRemoves(n: Node, v: Int): Unit = {
+//    require(isSkipList(n))
+//  } ensuring (_ => !isInTheList(v,remove(n,v)))
+//
+//  // 5 - If sl is a skiplist and b is in sl, insert(sl, a) contains b =======
+//  def insertDoesNotRemoveElements(sl: SkipList, a: Int, height: Int, b: Int): Unit = {
+//    require(isSkipList(sl))
+//    require(height>=0)
+//    require(isInTheList(b,sl))
+//  } ensuring (_ => isInTheList(b,insert(sl,a,height)))
+//
+//  def insertDoesNotRemoveElements(n: Node, a: Int, height: Int, b: Int): Unit = {
+//    require(isSkipList(n))
+//    require(height>=0)
+//    require(isInTheList(b,n))
+//  } ensuring (_ => isInTheList(b,insert(n,a,height)))
+//
+//  // 6 - If sl is a skiplist and b is in sl, remove(sl, a != b) contains b ===
+//  def removeDoesNotRemoveOtherElements(sl: SkipList, a: Int, b: Int): Unit = {
+//    require(isSkipList(sl))
+//    require(isInTheList(b,sl))
+//  } ensuring (_ => isInTheList(b,remove(sl,a)))
+//  
+//  def removeDoesNotRemoveOtherElements(n: Node, a: Int, b: Int): Unit = {
+//    require(isSkipList(n))
+//    require(isInTheList(b,n))
+//  } ensuring (_ => isInTheList(b,remove(n,a)))
+//
+//  // 7 - If sl is a skiplist and a is in sl, search(sl, a) returns Some(a) ===
+//  def searchFindsElement(sl: SkipList, v: Int): Unit = {
+//    require(isSkipList(sl))
+//    require(isInTheList(v,sl))
+//  } ensuring (_ => search(sl,v) == Some(v))
+//
+//  def searchFindsElement(n: Node, v: Int): Unit = {
+//    require(isSkipList(n))
+//    require(isInTheList(v,n))  
+//    n match {
+//      case Leaf => ()
+//      case SkipNode(value, down, right, height) => {
+//        if(isValueInRightSubtree(v, right)){
+//          (assume(isValueInRightSubtree(v, right)))
+//        } else {
+//          assume(isInTheList(v,down))
+//
+//        }
+//      }
+//    }
+//  } ensuring (_ => search(n,v) == Some(v))
 
   // 8 - If sl is a skiplist and a is not in sl, search(sl, a) returns None ==
-  def searchFindsNone(sl: SkipList, v: Int): Unit = {
-    require(isSkipList(sl))
-    require(!isInTheList(v,sl))
-  } ensuring (_ => search(sl,v) == None())
+//  def searchFindsNone(sl: SkipList, v: Int): Unit = {
+//    require(isSkipList(sl))
+//    require(!isInTheList(v,sl))
+//  } ensuring (_ => search(sl,v) == None())
 
-  def searchFindsNone(n: Node, v: Int): Unit = {
-    require(isSkipList(n))
-    require(!isInTheList(v,n))
-  } ensuring (_ => search(n,v) == None())
+//  def searchFindsNone(n: Node, v: Int): Unit = {
+//    require(isSkipList(n))
+//    require(!isInTheList(v,n))
+//    n match {
+//      case Leaf => ()
+//      case SkipNode(value, down, right, height) => {
+//        assert(value != v)
+//        assert(!isValueInRightSubtree(v, right))
+//        assume(!isInTheList(v,right))
+//          searchFindsNone(down,v)
+//          searchFindsNone(right,v)
+//      }
+//    }
+//  } ensuring (_ => search(n,v) == None())
 
   //_________________________________________________________LEMMAS____________________________________________________
+  
+  // Lemmas for 8
+  
+
+  
+  
+  
+  
+  
+  
+  
+  
   def elementOfSkipListIsSkipList(t: SkipNode): Unit = { // Is not used in proofs, but keep it there to make sure we don't break SkipList axioms
   require(isSkipList(t))
   assert(levelsAxiom(t.down))
@@ -611,7 +645,7 @@ object SkipList {
         case x@SkipNode(_, downR, rightR, _) => {
           sizeRightIsNonNegative(n)
           inRightSubtreeImpliesLowerMeasure(n, x)
-          lowerLevelIsSupersetofHigherOne(n, x)
+          higherLevelIsSubsetofLowerOne(n, x)
           nodeHeightIsNonNegative(down)
           sizeAtRightIsLower(down, downR)
           down match {
@@ -674,10 +708,78 @@ object SkipList {
     case SkipNode(value, down, right, height) => isValueInRightSubtree(target,of) || isInTheList(target,down)
     case Leaf => false
   }
+
+  //def isInTheListImpliesisInTheListDown(target : Int, of : SkipNode): Unit = {
+  //  require(isSkipList(of))
+  //  require(isInTheList(target,of))
+  //  require(of.height>=1)
+  //  if(isInRightSubtree(x, n))
+  //  assert(of.down.isInstanceOf[SkipNode])
+  //  of.right match {
+  //    case a@SkipNode(v,d,r,h) => {
+  //      lowerLevelIsSupersetofHigherOne(a,of)
+  //    }
+  //    case Leaf => ()
+  //  }
+  //} ensuring (_ => (isInTheList(target,of.down)))
+//  def isNotInTheListImpliesNotInRightSubList(target : Int, of : SkipNode): Unit = {
+//    require(isSkipList(of))
+//    require(!isInTheList(target,of))
+//    assert(!isValueInRightSubtree(target,of))
+//    assert(!isValueInRightSubtree(target,of.right))
+//    isInTheList(target,of.right)
+//    assert(!isInTheList(target,of.down))
+//    of.right match {
+//      case Leaf => ()
+//      case SkipNode(value, down, right, height) => assert(!isInTheList(target,down))
+//    }
+//
+//  } ensuring (_ => (!isInTheList(target,of.right)))
+
   def isInTheList(target : Int, of : SkipList): Boolean = {
     return isValueInRightSubtree(target,of.head)
   }
 
+  //‡def higherLevelIsSubsetofLowerOneValue(v : Int, n: SkipNode): Unit = {
+  //‡  require(isSkipList(n))
+  //‡  require(isValueInRightSubtree(v, n))
+  //‡  n.right match {
+  //‡    case r@SkipNode(value, _, _, _) => {
+  //‡      if(value == v){
+  //‡        ()
+  //‡      }
+  //‡      higherLevelIsSubsetofLowerOneValue(v, r)
+  //‡      (r.down, n.down) match {
+  //‡        case (rD@SkipNode(_, _, _, _), nD@SkipNode(_, _, _, _)) => isInRightSubtreeTransitiveValue(nD, rD, v)
+  //‡        case _ => ()
+  //‡      }
+  //‡    }
+  //‡  }
+  //‡} ensuring (_ => isValueInRightSubtree(v, n.down))
+
+
+//  def isInRightSubtreeTransitiveValue(n1: SkipNode, n2: SkipNode, n3: Int): Unit = {
+//    require(isSkipList(n1))
+//    require(isInRightSubtree(n2, n1))
+//    require(isValueInRightSubtree(n3, n2))
+//    n2.right match {
+//      case Leaf => assume(isValueInRightSubtree(n3, n1))  
+//      case n2R@SkipNode(value, down, right, height) => {
+//        if (n3 != value){
+//          rightIsAlsoInRightSubtree(n1, n2)
+//          //isInRightSubtreeTransitiveValue(n1, n2R, n3)
+//          assume(isValueInRightSubtree(n3, n1))
+//        } else {
+//          rightIsAlsoInRightSubtree(n1, n2)
+//          assert(isInRightSubtree(n2R, n1))
+//          assert(isValueInRightSubtree(value,n1))
+//          assert(value == n3)
+//        }
+//      }
+//    }
+//
+//  } ensuring (_ => isValueInRightSubtree(n3, n1))
+//
   // Auxiliary lemmas used to validate SkipList methods
   def newDownReturnsValidElement(t: Node, v: Int): Unit = {
     require(isSkipList(t))
