@@ -18,12 +18,12 @@ object SkipList {
           r match {
             case SkipNode(vR,_,_,_) => 
               if (vR <= target) { // If value is somewhere to the right, go right
-                search(r, target)
+                search_(r, target)
               }
               else { // If not, try down
-                search(d, target)
+                search_(d, target)
               }
-            case Leaf => search(d, target) // Reached the end of this level, go down
+            case Leaf => search_(d, target) // Reached the end of this level, go down
           }
         }
     case Leaf => None()
