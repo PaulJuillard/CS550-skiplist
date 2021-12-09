@@ -86,12 +86,51 @@ object SkipList {
       case topleft@SkipNode(_,_,_,_) =>
         val level_leftmost = levelLeft(topLeft, level)
         val newLevelLeft = insertRight(level_leftmost, k, desiredHeight, lowerLevelLeft)
+        assert(isRight(newLevelLeft,k)) //TODO
         if(level < topleft.height) insertLevelUp(k, desiredHeight, topLeft, level+1, newLevelLeft)
         else newLevelLeft
       
       case Leaf => Leaf //NOTE this should not happen
     }
   }// .ensuring(_ => if(level < desiredHeight) isIn(newLevelLeft, k)) TODO
+
+  def isRight(t: Node, v: Int): Boolean = {
+    require(isSkipList(t))
+    assert(hasNonNegativeHeight(t))
+    //decreases(size(t))
+    t match {
+      case SkipNode(value,_,r,h) =>
+        if(v == value) true
+        else {
+          isRight(r,v)
+        }
+      case Leaf => false
+    }
+  }
+
+  //proves that if newDown contains k, it returns a skipnode of value k
+  def newDownReturnsNode(t: Node, v : Int): Unit = {
+    require(isSkipList(t))
+    require(size(t) >= 0)
+    require(isRight(t, v))
+    decreases(size(t))
+    t match {
+      case sn@SkipNode(value, _, r, h) =>
+        if(v == value) assert(findNewDown(sn, v) == sn)
+        else {
+          assert(isRight(r,v))
+          assert(r.isInstanceOf[SkipNode])
+          r match {
+           case sn2@SkipNode(_,_,_,_) =>
+             sizeSkipNodeIsPositive(sn2)
+            case Leaf => ()
+          }
+          sizeDecreasesToTheRight(sn)
+          newDownReturnsNode(r, v)
+        }
+      case Leaf => ()
+    }
+  }.ensuring(_=> findNewDown(t, v).isInstanceOf[SkipNode]) //and SkipNode(v,_,_,h)
 
   //NOTE lowerlevel is the new node under t with inserted value k
   // we need to update all links
@@ -100,11 +139,17 @@ object SkipList {
     require(isSkipList(lowerLevel))
     require(size(t) >= 0)
     require(nodeHeight(lowerLevel) < nodeHeight(t))
+    require(isRight(lowerLevel, k))
     decreases(size(t))
     t match {
       case sn@SkipNode(value, down, right, height) => {
         val newDown = findNewDown(lowerLevel, value) // down node to update link with
-        //newDownReturnsValidElement(lowerLevel, value) //TODO
+        newDownReturnsValidElement(lowerLevel, value)
+        assert(isSkipList(newDown))
+        //assert(lowerLevelIsSupersetofHigherOne(t,lowerLevel)) 
+        assert(isRight(lowerLevel, value))
+        newDownReturnsNode(lowerLevel, value)
+        assert(nodeHeight(newDown) == nodeHeight(lowerLevel)) //TODO wrong if k not in lowerlevel, maybe use levels
         right match {
           case SkipNode(valueR, downR, rightR, heightR) => {
             if ((desiredHeight < height) || //dont need to insert anymore
@@ -125,7 +170,6 @@ object SkipList {
               //precondition checks
               sizeDecreasesToTheRight(sn)
               sizeIsNonNegative(right)
-              //elementOfSkipListIsSkipList(lowerLevel)
               val newRight = insertRight(right, k, desiredHeight, newDown) //keep going right to update down links
               val insertedNode = SkipNode(k, insertedDown, newRight, height)
               val ret = SkipNode(value, newDown, insertedNode, height)
@@ -144,7 +188,7 @@ object SkipList {
             else { // Just update down
               val ret = SkipNode(value, newDown, Leaf, height)
               assert(nodeHeight(newDown) == nodeHeight(lowerLevel))
-              assert(heightDecreasesDown(ret))
+              assert(heightDecreasesDown(ret)) //TODO
               assert(isSkipList(ret))
               ret
             }
@@ -155,6 +199,7 @@ object SkipList {
     }
   }
 
+  // boil node up to level newHeight
   def increaseHeight(t: Node, newHeight: Int): Node = {
     require(isSkipList(t))
     //TODO decreases(newHeight - nodeHeight(t))
@@ -173,10 +218,11 @@ object SkipList {
   def insert(sl: SkipList, k: Int, height: Int): SkipList = {
     require(isSkipList(sl))
     require(height >= 0)
-    val newHeight = increaseHeight(sl.head, height)
-    assert(isSkipList(newHeight))
-    SkipList(insertLevelUp(k, height, newHeight, 0, Leaf), max(sl.maxHeight, height))
-  }
+    // if needed, bring first value to same height
+    val newHead = increaseHeight(sl.head, height)
+    assert(isSkipList(newHead))
+    SkipList(insertLevelUp(k, height, newHead, 0, Leaf), max(sl.maxHeight, height))
+  } 
 
   /*
   def
@@ -193,7 +239,9 @@ object SkipList {
   */
 
   def findNewDown(t: Node, v: Int): Node = t match {
-    case SkipNode(value, down, right, height) => if (value == v) {t} else {findNewDown(right, v)}
+    case SkipNode(value, down, right, height) => 
+      if (value == v) {t} 
+      else {findNewDown(right, v)}
     case Leaf => Leaf
   }
 
