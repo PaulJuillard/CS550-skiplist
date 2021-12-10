@@ -74,90 +74,90 @@ object SkipList {
     }
   }
 
-  def insertUpwards(k: Int, desiredHeight: BigInt, topLeftmost: Node, currentLevel: BigInt, lowerLeftmost: Node): Node = {
-    // insertRight in levels 0 to maxHeight
-    // if desiredHeight is lower than level, simply updates links to the new subtree
-    require(isSkipList(topLeftmost))
-    require(isSkipList(lowerLeftmost))
-    require(desiredHeight >= 0)
-    require(currentLevel >= 0)
-    // TODO decreases(nodeHeight(topLeft) - level)
-    topLeftmost match {
-      case topLeftmost@SkipNode(_,_,_,_) => {
-        val currentLeftmost = levelLeftmost(topLeftmost, currentLevel)
-        val newLevelLeftmost = insertRight(currentLeftmost, k, desiredHeight, lowerLeftmost)
-        assert(isInRightSubtree(k, newLevelLeftmost))
-        if (currentLevel < topLeftmost.height) {insertUpwards(k, desiredHeight, topLeftmost, currentLevel+1, newLevelLeftmost)}
-        else newLevelLeftmost
-      }
-      case Leaf => Leaf //NOTE this should not happen
-    }
-  }// .ensuring(_ => if(level < desiredHeight) isIn(newLevelLeft, k)) TODO
+  // def insertUpwards(k: Int, desiredHeight: BigInt, topLeftmost: Node, currentLevel: BigInt, lowerLeftmost: Node): Node = {
+  //   // insertRight in levels 0 to maxHeight
+  //   // if desiredHeight is lower than level, simply updates links to the new subtree
+  //   require(isSkipList(topLeftmost))
+  //   require(isSkipList(lowerLeftmost))
+  //   require(desiredHeight >= 0)
+  //   require(currentLevel >= 0)
+  //   // TODO decreases(nodeHeight(topLeft) - level)
+  //   topLeftmost match {
+  //     case topLeftmost@SkipNode(_,_,_,_) => {
+  //       val currentLeftmost = levelLeftmost(topLeftmost, currentLevel)
+  //       val newLevelLeftmost = insertRight(currentLeftmost, k, desiredHeight, lowerLeftmost)
+  //       assert(isInRightSubtree(k, newLevelLeftmost))
+  //       if (currentLevel < topLeftmost.height) {insertUpwards(k, desiredHeight, topLeftmost, currentLevel+1, newLevelLeftmost)}
+  //       else newLevelLeftmost
+  //     }
+  //     case Leaf => Leaf //NOTE this should not happen
+  //   }
+  // }// .ensuring(_ => if(level < desiredHeight) isIn(newLevelLeft, k)) TODO
 
   // Note : lowerLeftmost is the new node under t with inserted value k
   // we need to update all links
-  def insertRight(t: Node, k: Int, desiredHeight: BigInt, lowerLeftmost: Node): Node = {
-    require(isSkipList(t))
-    require(isSkipList(lowerLeftmost))
-    require(size(t) >= 0)
-    require((nodeHeight(lowerLeftmost) + 1) == nodeHeight(t))
-    require(isInRightSubtree(k, lowerLeftmost))
-    decreases(size(t))
-    t match {
-      case sn@SkipNode(value, down, right, height) => {
-        val newDown = findNewDown(lowerLeftmost, value) // Down node to update link with
-        newDownReturnsSkipList(lowerLeftmost, value)
-        //assert(lowerLevelIsSupersetofHigherOne(t,lowerLevel)) 
-        assert(isInRightSubtree(value, lowerLeftmost))
-        newDownReturnsNode(lowerLeftmost, value)
-        assert(nodeHeight(newDown) == nodeHeight(lowerLeftmost)) // TODO prove that value is always in lower level
-        right match {
-          case SkipNode(valueR, downR, rightR, heightR) => {
-            if ((desiredHeight < height) || // dont need to insert anymore
-                (valueR <= k) || // insert is further right
-                (value >= k)) {  // passed the insertion point
-              // simply update down
-              sizeDecreasesToTheRight(sn)
-              sizeIsNonNegative(right)
-              // update link down with newdown
-              // recurse right
-              val ret = SkipNode(value, newDown, insertRight(right, k, desiredHeight, newDown), height)
-              assert(isSkipList(ret))
-              ret
-            }
-            else {
-              // Insert to the right
-              val insertedDown = findNewDown(lowerLeftmost, k) // Inserted node at lowerlevel, which must be insertedNode.down
-              sizeDecreasesToTheRight(sn)
-              sizeIsNonNegative(right)
-              val newRight = insertRight(right, k, desiredHeight, newDown) // Keep going right to update down links
-              val insertedNode = SkipNode(k, insertedDown, newRight, height)
-              val ret = SkipNode(value, newDown, insertedNode, height)
-              assert(isSkipList(ret))
-              ret
-            }
-          }
-          case Leaf => { // Reached end of list
-            if (value < k && height <= desiredHeight) { // we need to insert to the right
-              val insertedDown = findNewDown(lowerLeftmost, k) // inserted node at lowerlevel, which must be insertedNode.down
-              val insertedNode = SkipNode(k, insertedDown, Leaf, height)
-              val ret = SkipNode(value, newDown, insertedNode, height)
-              assert(isSkipList(ret))
-              ret
-            }
-            else { // Just update down
-              val ret = SkipNode(value, newDown, Leaf, height)
-              assert(nodeHeight(newDown) == nodeHeight(lowerLeftmost))
-              assert(heightDecreasesDown(ret))
-              assert(isSkipList(ret))
-              ret
-            }
-          }
-        }
-      }
-      case Leaf => Leaf
-    }
-  }
+  // def insertRight(t: Node, k: Int, desiredHeight: BigInt, lowerLeftmost: Node): Node = {
+  //   require(isSkipList(t))
+  //   require(isSkipList(lowerLeftmost))
+  //   require(size(t) >= 0)
+  //   require((nodeHeight(lowerLeftmost) + 1) == nodeHeight(t))
+  //   require(isInRightSubtree(k, lowerLeftmost))
+  //   decreases(size(t))
+  //   t match {
+  //     case sn@SkipNode(value, down, right, height) => {
+  //       val newDown = findNewDown(lowerLeftmost, value) // Down node to update link with
+  //       newDownReturnsSkipList(lowerLeftmost, value)
+  //       //assert(lowerLevelIsSupersetofHigherOne(t,lowerLevel)) 
+  //       assert(isInRightSubtree(value, lowerLeftmost))
+  //       newDownReturnsNode(lowerLeftmost, value)
+  //       assert(nodeHeight(newDown) == nodeHeight(lowerLeftmost)) // TODO prove that value is always in lower level
+  //       right match {
+  //         case SkipNode(valueR, downR, rightR, heightR) => {
+  //           if ((desiredHeight < height) || // dont need to insert anymore
+  //               (valueR <= k) || // insert is further right
+  //               (value >= k)) {  // passed the insertion point
+  //             // simply update down
+  //             sizeDecreasesToTheRight(sn)
+  //             sizeIsNonNegative(right)
+  //             // update link down with newdown
+  //             // recurse right
+  //             val ret = SkipNode(value, newDown, insertRight(right, k, desiredHeight, newDown), height)
+  //             assert(isSkipList(ret))
+  //             ret
+  //           }
+  //           else {
+  //             // Insert to the right
+  //             val insertedDown = findNewDown(lowerLeftmost, k) // Inserted node at lowerlevel, which must be insertedNode.down
+  //             sizeDecreasesToTheRight(sn)
+  //             sizeIsNonNegative(right)
+  //             val newRight = insertRight(right, k, desiredHeight, newDown) // Keep going right to update down links
+  //             val insertedNode = SkipNode(k, insertedDown, newRight, height)
+  //             val ret = SkipNode(value, newDown, insertedNode, height)
+  //             assert(isSkipList(ret))
+  //             ret
+  //           }
+  //         }
+  //         case Leaf => { // Reached end of list
+  //           if (value < k && height <= desiredHeight) { // we need to insert to the right
+  //             val insertedDown = findNewDown(lowerLeftmost, k) // inserted node at lowerlevel, which must be insertedNode.down
+  //             val insertedNode = SkipNode(k, insertedDown, Leaf, height)
+  //             val ret = SkipNode(value, newDown, insertedNode, height)
+  //             assert(isSkipList(ret))
+  //             ret
+  //           }
+  //           else { // Just update down
+  //             val ret = SkipNode(value, newDown, Leaf, height)
+  //             assert(nodeHeight(newDown) == nodeHeight(lowerLeftmost))
+  //             assert(heightDecreasesDown(ret))
+  //             assert(isSkipList(ret))
+  //             ret
+  //           }
+  //         }
+  //       }
+  //     }
+  //     case Leaf => Leaf
+  //   }
+  // }
 
   // boil node up to level newHeight
   def increaseHeight(t: Node, newHeight:BigInt): Node = {
@@ -175,14 +175,14 @@ object SkipList {
     }
   }
 
-  def insert(sl: SkipList, k: Int, height: BigInt): SkipList = {
-    require(isSkipList(sl))
-    require(height >= 0)
-    // if needed, bring first value to same height
-    val newHead = increaseHeight(sl.head, height)
-    assert(isSkipList(newHead))
-    SkipList(insertUpwards(k, height, newHead, 0, Leaf), max(sl.maxHeight, height))
-  } 
+  // def insert(sl: SkipList, k: Int, height: BigInt): SkipList = {
+  //   require(isSkipList(sl))
+  //   require(height >= 0)
+  //   // if needed, bring first value to same height
+  //   val newHead = increaseHeight(sl.head, height)
+  //   assert(isSkipList(newHead))
+  //   SkipList(insertUpwards(k, height, newHead, 0, Leaf), max(sl.maxHeight, height))
+  // } 
 
   // def insert(sl: SkipList, k:BigInt): SkipList = {
   //    if (isIn(sl, k)) {
@@ -326,10 +326,10 @@ object SkipList {
 
   def isInRightSubtree(target: Int, of: Node): Boolean = {
     of match {
-      case Leaf => false
       case SkipNode(_, _, r@SkipNode(vRight, _, _, _), _) => {
         (target == vRight) || isInRightSubtree(target, r)
       }
+      case _ => false
     }
   }
 
@@ -416,6 +416,27 @@ object SkipList {
     }
   } ensuring (_ => isInRightSubtree(x.down, n.down))
 
+  def higherLevelIsSubsetofLowerOne(v: Int, n: SkipNode): Unit = {
+    require(isSkipList(n))
+    require(isInRightSubtree(v, n))
+    assert(isSkipNode(n.right))
+    n.right match {
+      case r@SkipNode(valueR, downR, _, _) => {
+        if (v != valueR) {
+          higherLevelIsSubsetofLowerOne(v, r)
+          (r.down, n.down) match {
+            case (rD@SkipNode(_, _, _, _), nD@SkipNode(_, _, _, _)) => isInRightSubtreeTransitive(nD, rD, v)
+          }
+        }
+        else {
+          (r.down, n.down) match {
+            case (rD@SkipNode(_, _, _, _), nD@SkipNode(_, _, _, _)) => isInRightSubtreeImpliesValueIsAlsoIn(nD, rD)
+          }
+        }
+      }
+    }
+  } ensuring (_ => isInRightSubtree(v, n.down))
+
 /*  
    1 - If sl is a skiplist, insert(sl, a) is also a skiplist ==============
   def insertReturnsSkiplist(sl : SkipList, v:BigInt, height:BigInt): Unit = {
@@ -497,8 +518,8 @@ object SkipList {
     n match {
       case Leaf => ()
       case SkipNode(value, down, right, height) => {
-        if(isValueInRightSubtree(v, right)){
-          (assume(isValueInRightSubtree(v, right)))
+        if(isInRightSubtree(v, right)){
+          (assume(isInRightSubtree(v, right)))
         } else {
           assume(isInTheList(v,down))
 
@@ -520,7 +541,7 @@ object SkipList {
       case Leaf => ()
       case SkipNode(value, down, right, height) => {
         assert(value != v)
-        assert(!isValueInRightSubtree(v, right))
+        assert(!isInRightSubtree(v, right))
         assume(!isInTheList(v,right))
           searchFindsNone(down,v)
           searchFindsNone(right,v)
@@ -618,6 +639,18 @@ object SkipList {
       rightIsAlsoInRightSubtree(n1, n2)
     }
   } ensuring (_ => isInRightSubtree(n3, n1))
+
+  def isInRightSubtreeTransitive(n1: SkipNode, n2: SkipNode, n3: Int): Unit = {
+    require(isInRightSubtree(n2, n1))
+    require(isInRightSubtree(n3, n2))
+    if (n1.right != n2) {
+      assert(isInRightSubtree(n2, n1.right))
+      assert(isSkipNode(n1.right))
+      n1.right match {
+        case r@SkipNode(_, _, _, _) => isInRightSubtreeTransitive(r, n2, n3)
+      }
+    }
+  } ensuring (isInRightSubtree(n3, n1))
 
   // Proof that size(right) decreases
   def sizeRightIsNonNegative(t: Node): Unit = {
@@ -745,6 +778,18 @@ object SkipList {
     }
   }.ensuring(_=> isSkipNode(findNewDown(t, v))) // and SkipNode(v,_,_,h)
 
+  // Proof that isInRightSubtree(node, node) implies isInRightSubtree(v, node)
+  def isInRightSubtreeImpliesValueIsAlsoIn(n: SkipNode, target: SkipNode): Unit = {
+    require(isSkipList(n))
+    require(isSkipList(target))
+    require(isInRightSubtree(target, n))
+    if (target != n.right) {
+      n.right match {
+        case r@SkipNode(_, _, _, _) => isInRightSubtreeImpliesValueIsAlsoIn(r, target)
+      }
+    }
+  } ensuring (_ => isInRightSubtree(target.value, n))
+
 
   @extern
   def assume(b: Boolean): Unit = {
@@ -753,7 +798,7 @@ object SkipList {
 
 
   // Auxiliary functions
-  def isSkipNode(n: Node): Boolean = n match {case _ => true; case Leaf => false}
+  def isSkipNode(n: Node): Boolean = n match {case Leaf => false; case _ => true}
   def isLeaf(n: Node): Boolean = !isSkipNode(n)
 
   def size(t: Node): BigInt = t match {
@@ -765,18 +810,9 @@ object SkipList {
     case SkipNode(value, down, right, height) => 1 + sizeRight(right)
     case Leaf => 0
   }
-
-  def isValueInRightSubtree(target: Int, of: Node): Boolean = {
-    of match {
-      case Leaf => false
-      case SkipNode(vOf, _, rOf, _) => {
-        (target == vOf) || isValueInRightSubtree(target, rOf)
-      }
-    }
-  }
   
   def isInTheList(target: Int, of : Node): Boolean = of match {
-    case SkipNode(value, down, right, height) => isValueInRightSubtree(target,of) || isInTheList(target,down)
+    case SkipNode(value, down, right, height) => isInRightSubtree(target,of) || isInTheList(target,down)
     case Leaf => false
   }
 
@@ -797,8 +833,8 @@ object SkipList {
   //  def isNotInTheListImpliesNotInRightSubList(target :BigInt, of : SkipNode): Unit = {
   //    require(isSkipList(of))
   //    require(!isInTheList(target,of))
-  //    assert(!isValueInRightSubtree(target,of))
-  //    assert(!isValueInRightSubtree(target,of.right))
+  //    assert(!isInRightSubtree(target,of))
+  //    assert(!isInRightSubtree(target,of.right))
   //    isInTheList(target,of.right)
   //    assert(!isInTheList(target,of.down))
   //    of.right match {
@@ -809,48 +845,9 @@ object SkipList {
   //  } ensuring (_ => (!isInTheList(target,of.right)))
 
   def isInTheList(target: Int, of: SkipList): Boolean = {
-    return isValueInRightSubtree(target,of.head)
+    return isInRightSubtree(target,of.head)
   }
-
-  def higherLevelIsSubsetofLowerOneValue(v: Int, n: SkipNode): Unit = {
-    require(isSkipList(n))
-    require(isValueInRightSubtree(v, n))
-    n.right match {
-      case r@SkipNode(value, _, _, _) => {
-        if(value == v){
-          ()
-        }
-        higherLevelIsSubsetofLowerOneValue(v, r)
-        (r.down, n.down) match {
-          case (rD@SkipNode(_, _, _, _), nD@SkipNode(_, _, _, _)) => isInRightSubtreeTransitive(nD, rD, v)
-          case _ => ()
-        }
-      }
-    }
-  } ensuring (_ => isValueInRightSubtree(v, n.down))
-
-
-  def isInRightSubtreeTransitive(n1: SkipNode, n2: SkipNode, n3: Int): Unit = {
-    require(isSkipList(n1))
-    require(isInRightSubtree(n2, n1))
-    require(isValueInRightSubtree(n3, n2))
-    n2.right match {
-      case Leaf => assume(isValueInRightSubtree(n3, n1))  
-      case n2R@SkipNode(value, down, right, height) => {
-        if (n3 != value) {
-          rightIsAlsoInRightSubtree(n1, n2)
-          //isInRightSubtreeTransitiveValue(n1, n2R, n3)
-          assume(isValueInRightSubtree(n3, n1))
-        } else {
-          rightIsAlsoInRightSubtree(n1, n2)
-          assert(isInRightSubtree(n2R, n1))
-          assert(isValueInRightSubtree(value,n1))
-          assert(value == n3)
-        }
-      }
-    }
-  }
-  // } ensuring (_ => isValueInRightSubtree(n3, n1))
+  // } ensuring (_ => isInRightSubtree(n3, n1))
 
   // Auxiliary lemmas used to validate SkipList methods
   def newDownReturnsSkipList(t: Node, v: Int): Unit = {
