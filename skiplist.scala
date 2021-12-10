@@ -160,20 +160,40 @@ object SkipList {
   // }
 
   // boil node up to level newHeight
-  def increaseHeight(t: Node, newHeight:BigInt): Node = {
-    require(isSkipList(t))
-    //TODO decreases(newHeight - nodeHeight(t))
-    t match {
-      case SkipNode(value, down, right, height) => 
+  def increaseHeight(n: Node, newHeight:BigInt): Node = {
+    require(isSkipList(n))
+    require(newHeight >= nodeHeight(n))
+    decreases(newHeight - nodeHeight(n))
+    n match {
+      case n@SkipNode(value, down, right, height) => {
         if (height >= newHeight) {
-          t
+          n
         } 
         else {
-          increaseHeight(SkipNode(value, t, Leaf, height+1), newHeight)
+          nodeHeightIsNonNegative(n)
+          nodeHeightisNodeHeight(n)
+          increaseHeight(SkipNode(value, n, Leaf, height+1), newHeight)
         }
+      }
       case Leaf => Leaf
     }
   }
+
+  def nodeHeightisNodeHeight(n: SkipNode): Unit = {
+    require(isSkipList(n))
+    require(nodeHeight(n) >= 0)
+    decreases(nodeHeight(n))
+    n.down match {
+      case SkipNode(_, down, _, _) => {
+        down match {
+          case down@SkipNode(_, _, _, _) => {nodeHeightIsNonNegative(down); nodeHeightisNodeHeight(down)}
+          case Leaf => ()
+        }
+        
+      }
+      case Leaf => ()
+    }
+  } ensuring (_ => nodeHeight(n) == n.height)
 
   // def insert(sl: SkipList, k: Int, height: BigInt): SkipList = {
   //   require(isSkipList(sl))
@@ -755,28 +775,31 @@ object SkipList {
 
 
   // Proof that if newDown contains k, it returns a skipnode of value k
-  def newDownReturnsNode(t: Node, v: Int): Unit = {
-    require(isSkipList(t))
-    require(size(t) >= 0)
-    require(isInRightSubtree(v, t))
-    decreases(size(t))
-    t match {
-      case sn@SkipNode(value, _, r, h) =>
-        if(v == value) assert(findNewDown(sn, v) == sn)
-        else {
-          assert(isInRightSubtree(v, r))
-          assert(isSkipNode(r))
-          r match {
-           case sn2@SkipNode(_,_,_,_) =>
-             sizeSkipNodeIsPositive(sn2)
-            case Leaf => ()
+  def newDownReturnsNode(n: Node, v: Int): Unit = {
+    require(isSkipList(n))
+    require(size(n) >= 0)
+    require(isInRightSubtree(v, n))
+    decreases(size(n))
+    n match {
+      case n@SkipNode(value, _, r, h) => {
+        r match {
+          case SkipNode(valueR, _, _, _) => {
+            if (v != valueR) {
+              assert(isInRightSubtree(v, r))
+              r match {
+                case r@SkipNode(_,_,_,_) => {
+                  isInRightSubtreeTransitive(n, r, v)
+                  sizeSkipNodeIsPositive(r)
+                }
+              }
+              sizeDecreasesToTheRight(n)
+              newDownReturnsNode(r, v)
+            }
           }
-          sizeDecreasesToTheRight(sn)
-          newDownReturnsNode(r, v)
         }
-      case Leaf => ()
+      }
     }
-  }.ensuring(_=> isSkipNode(findNewDown(t, v))) // and SkipNode(v,_,_,h)
+  }.ensuring(_=> isSkipNodeOfValue(findNewDown(n, v), v))
 
   // Proof that isInRightSubtree(node, node) implies isInRightSubtree(v, node)
   def isInRightSubtreeImpliesValueIsAlsoIn(n: SkipNode, target: SkipNode): Unit = {
@@ -799,6 +822,7 @@ object SkipList {
 
   // Auxiliary functions
   def isSkipNode(n: Node): Boolean = n match {case Leaf => false; case _ => true}
+  def isSkipNodeOfValue(n: Node, k: Int): Boolean = n match {case SkipNode(k, _, _, _) => true; case _ => false}
   def isLeaf(n: Node): Boolean = !isSkipNode(n)
 
   def size(t: Node): BigInt = t match {
