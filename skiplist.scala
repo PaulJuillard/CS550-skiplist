@@ -245,6 +245,7 @@ object SkipList {
     require(nodeHeight(oldCurrentLeftmost) == nodeHeight(newLowerLeftmost) + 1)
     require(sizeRight(oldCurrentLeftmost) >= 0)
     decreases(sizeRight(oldCurrentLeftmost))
+
     (oldCurrentLeftmost, newLowerLeftmost) match {
       case (oldCurrentLeftmost@SkipNode(value, down, right, height), newLowerLeftmost@SkipNode(valueL, downL, rightL, heightL)) => {
         val newDown = findNewDown(newLowerLeftmost, value)
@@ -261,8 +262,12 @@ object SkipList {
               newDownReturnsSkipNodeOfValue(newLowerLeftmost, value)
               newDownIsInRightSubtreeOfOld(newLowerLeftmost, value)
               inRightSubtreeHasSameNodeHeight(newLowerLeftmost, newDown)
+              
+              // Hugo's
               toTheRightIsStillSuperset(newLowerLeftmost, newDown, right, valueR)
+              assert(lowerLevelIsSuperset(right, newDown))
             }
+            assert(lowerLevelIsSuperset(right, newDown))
             SkipNode(value, newDown, plugLowerLevel(right, newDown), height)
           }
           case Leaf => SkipNode(value, newDown, Leaf, height)
@@ -271,6 +276,7 @@ object SkipList {
     }
   }
 
+
   def toTheRightIsStillSuperset(newLowerLeftmost: Node, newDown: Node, n: Node, v: Int): Unit = {
     require(isSkipList(n))
     require(isSkipList(newLowerLeftmost))
@@ -278,18 +284,26 @@ object SkipList {
     require(isInRightSubtree(newDown, newLowerLeftmost))
     require(isSkipNodeOfValue(n, v))
     require(isSkipNodeOfValueSmallerThan(newDown, v))
+
     newLowerLeftmost match {
       case SkipNode(value, down, right, height) => {
         if (newDown == right) {
+          
+          sizeIsNonNegative(newLowerLeftmost)
+          sizeIsNonNegative(n)
+          assert(size(newLowerLeftmost) >= 0)
+          assert(size(n) >= 0)
           /* 
           newLowerLeftMost superset n
           newDown subset newLowerLeftMost
           (newLowerLeftMost > n.value) in newDown
-          TODO
-          ==> newDown superSet n
+          
+          ==> newDown superSet n <=> n subset newdown
           */
-          //orderedSubsetOfSupersetIsStillSuperset(newLowerLeftmost,newDown,n,v)
-          assert(lowerLevelIsSuperset(n, newDown)) // TODO : Remove assume
+          assert(lowerLevelIsStrictSuperset(n, newLowerLeftmost)) //TODO easy: wtf this is covered by assertions
+          orderedSubsetOfSupersetIsStillSuperset(newLowerLeftmost,newDown,n,v)
+          supersetEquivSubset(n, newDown) // TODO unknown
+          assert(lowerLevelIsSuperset(n, newDown))
         }
         else {
           assume(lowerLevelIsStrictSuperset(n, right)) // TODO : Remove assume
@@ -299,54 +313,79 @@ object SkipList {
       }
     }
   } ensuring (_ => lowerLevelIsSuperset(n, newDown))
-
+  
   //n in {s in superset such that s.value > n.value}
-  /*
   def orderedSubsetOfSupersetIsStillSuperset(superSet: Node, superSetCut:Node, n: Node, cutoff: Int): Unit = {
     require(isSkipList(superSet))
     require(isSkipList(n))
-    require(isSkipNodeOfValue(n,cutoff))
+    require(isSkipNodeOfValueHigherThan(n,cutoff))
     require(isSkipNodeOfValue(superSetCut,cutoff))
     require(isInRightSubtree(superSetCut, superSet))
+    require(size(superSet) >= 0)
+    require(size(n) >= 0)
+    require(isSubset(n, superSet))
 
-    n match {
-      case SkipNode(_,_,r,h)=>
-        r match {
-          case SkipNode(valueR,_,_,_) =>
-            assert(isInRightSubtree(valueR,superSetCut))
-          case Leaf => ()
-        }
-
-      case Leaf => () //cant happen by require
+    decreases(size(superSet))
+    (superSet, n) match {
+      case (sup@SkipNode(superV,_,superR,_), 
+            sub@SkipNode(subV,_,subR,_)) =>
+            if(superV < subV){
+              sizeDecreasesToTheRight(sup)
+              subsetHeadNEQDecreasesSuperset(sub,sup)
+              assert(isSubset(n,superR))
+              assert(isInRightSubtree(superSetCut, superR)) // TODO ok tier
+              orderedSubsetOfSupersetIsStillSuperset(superR, superSetCut, n, cutoff)
+              ()
+            }
+            else if(superV == subV) {
+              assert(superSet == superSetCut) // TODO ok tier
+              ()
+            }
     }
-  }.ensuring(_ => lowerLevelIsStrictSuperset(superSetCut, n))
-  */
-  def subsetRightInSupersetRight(subset: Node, superset: Node): Unit = {
+  }.ensuring(_ => lowerLevelIsSuperset(superSetCut, n))
+
+  // NOTE incomplete
+  // NOTE equiv to proving subsetRightInSuperset
+  def subsetRightInSupersetRight(subset: SkipNode, superset: SkipNode): Unit = {
     require(isSkipList(superset))
     require(isSkipList(subset))
-    require(size(superset)> 0)
-    require(size(subset)> 0)
+    require(size(superset)>=0)
+    require(size(subset)>=0)
     require(isSubset(subset, superset))
+    decreases(size(subset))
+
     (superset, subset) match {
       case (x@SkipNode(superV,_,superR,_), 
             y@SkipNode(subV,_,subR,_)) =>
         sizeIsNonNegative(superR)
         sizeIsNonNegative(subR)
-        if(superV > subV) () //shouldnt happen
-        else if (superV == subV) assert(isSubset(subR, superR))
-        else {
-          assert(superV < subV)
-          assert(isSubset(subset, superR))
-          rightIsSubsetOfNode(y)
-          assert(isSubset(subR, subset))
-          subsetTransitivity(subR, subset, superR)
-          assert(isSubset(subR, superR))
-        }
-      case (Leaf, _) => ()
-      case _ => ()
-    }
-  }
 
+        (superR, subR) match {
+          case (superR@SkipNode(_,_,_,_),
+                subR@SkipNode(_,_,_,_)) =>
+
+                 if(superV > subV) () //shouldnt happen
+                 else if (superV == subV) assert(isSubset(subR, superR))
+                 else if(subV > superV) {
+                   // Option1:
+                   subsetHeadNEQDecreasesSuperset(subset, superset)
+                   assert(isSubset(subset, superR))
+                   rightIsSubsetOfNode(y) // subR in subset 
+                   // subsetTransitivity(subR, subset, superR)
+                   
+                   
+                   // Option2:
+                   // subsetRightInSupersetRight(subR, superR) // NOTE eq to solving subsetRightInSuperset eq to solving subsetTransitivity
+
+                   assert(isSubset(subR, superR)) //TODO hard: needs subsetRightInSuperset or subsetRightInSupersetRight
+                }
+          case (Leaf, _) => assert(isSubset(subR, superR))
+        }
+    }
+  }.ensuring(_ => isSubset(subset.right, superset.right))
+
+  // NOTE incomplete
+  // NOTE equiv to proving subsetRightInSupersetRight
   def subsetRightInSuperset(subset: SkipNode, superset: Node): Unit = {
     require(isSkipList(superset))
     require(isSkipList(subset))
@@ -354,6 +393,7 @@ object SkipList {
     require(size(subset)> 0)
     require(isSubset(subset, superset))
     decreases(size(subset) + size(superset))
+
     (superset, subset) match {
       case (sup@SkipNode(superV,_,superR,_), 
             sub@SkipNode(subV,_,subR,_)) =>
@@ -364,8 +404,8 @@ object SkipList {
         else if (superV == subV) ()
         else {
           assert(superV < subV)
-          
-          assert(isSubset(subR, superR)) //TODO eq to subsetRightInSupersetRight
+          //subsetRightInSupersetRight(sub,sup) //TODO hard: eq to subsetRightInSupersetRight
+          assert(isSubset(subR, superR))
           assert(isSubset(subR,superset))
         }
       case (Leaf, _) => ()
@@ -373,8 +413,7 @@ object SkipList {
     }
   }.ensuring(_ => isSubset(subset.right, superset))
 
-  //def subsetHeadNEQDecreasesSuperset(superset:Node, subset:Node): Un
-
+  // n.right in n
   def rightIsSubsetOfNode(node: SkipNode) : Unit = {
     require(isSkipList(node))
     require(size(node) >= 0)
@@ -382,6 +421,7 @@ object SkipList {
     subsetReflexivity(node.right)
   }.ensuring(_ => isSubset(node.right, node))
 
+  // n in n
   def subsetReflexivity(n: Node): Unit = {
     require(isSkipList(n))
     require(size(n) >= 0)
@@ -395,6 +435,7 @@ object SkipList {
     }
   }.ensuring(_=> isSubset(n,n))
 
+  // a in b and b in c => a in c
   def subsetTransitivity(subsubset: Node, subset:Node, superset:Node): Unit = {
     require(isSkipList(subsubset))
     require(isSkipList(subset))
@@ -414,11 +455,12 @@ object SkipList {
               sizeIsNonNegative(sR)
               if(ssV == sV){
                 //subset.r is subset of superset
-                subsetRightInSuperset(s, superset)
+                subsetRightInSuperset(s, superset) 
                 // subsubset.right is subset of subset.right
                 assert(isSubset(ssR, sR))
 
-                subsetTransitivity(ssR, sR, superset) //TODO
+                subsetTransitivity(ssR, sR, superset)
+                //TODO uknown, need to show (xs in A and x==y and y::ys in A) => x::xs in A
                 ()
               }
               else if(ssV > sV){
@@ -456,6 +498,18 @@ object SkipList {
     }
   }
 
+  // (a in b and a.head != b.head) => a in b.right
+  def subsetHeadNEQDecreasesSuperset(subset: SkipNode, superset:SkipNode): Unit = {
+    require(isSkipList(superset))
+    require(isSkipList(subset))
+    require(size(subset) >= 0)
+    require(size(superset) >= 0)
+    require(superset.value < subset.value)
+    require(isSubset(subset, superset))
+    sizeRightIsNonNegative(superset)
+    assert(isSubset(subset, superset.right))
+  }.ensuring(_ => isSubset(subset, superset.right))
+
   def lowerLevelIsStrictSuperset(n: Node, lower: Node): Boolean = {
     n match {
       case SkipNode(value, _, right, _) => {
@@ -464,6 +518,29 @@ object SkipList {
       case Leaf => true
     }
   }
+
+  //alias
+  def isSuperset(subset : Node, superset: Node): Boolean = {
+    require(isSkipNode(subset))
+    require(isSkipNode(superset))
+    lowerLevelIsSuperset(subset, superset)
+  }
+
+  // TODO unfortunately doesnt trivially work but havent tried otherwise
+  // NOTE maybe cut into:
+  //- a subset b   => b superset a
+  //- b superset a => a subset b
+  // probably more useful this way anyway
+  def supersetEquivSubset(subset: Node, superset: Node): Unit = {
+    require(isSkipList(subset))
+    require(isSkipList(superset))
+    require(isSkipNode(subset))
+    require(isSkipNode(superset))
+    require(size(subset) >= 0)
+    require(size(superset) >= 0)
+    ()
+  } ensuring (_ => isSubset(subset, superset) == isSuperset(subset, superset))
+  
 
   def lowerLevelIsSuperset(n: Node, lower: Node): Boolean = {
     require(isSkipNode(n))
@@ -475,6 +552,7 @@ object SkipList {
     }
   }
 
+  
   def newDownIsInRightSubtreeOfOld(n: Node, k: Int): Unit = {
     require(isSkipList(n))
     require(isSkipNodeOfValueSmallerThan(n, k))
