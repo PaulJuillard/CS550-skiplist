@@ -281,7 +281,15 @@ object SkipList {
     newLowerLeftmost match {
       case SkipNode(value, down, right, height) => {
         if (newDown == right) {
-          assume(lowerLevelIsSuperset(n, newDown)) // TODO : Remove assume
+          /* 
+          newLowerLeftMost superset n
+          newDown subset newLowerLeftMost
+          (newLowerLeftMost > n.value) in newDown
+          TODO
+          ==> newDown superSet n
+          */
+          //orderedSubsetOfSupersetIsStillSuperset(newLowerLeftmost,newDown,n,v)
+          assert(lowerLevelIsSuperset(n, newDown)) // TODO : Remove assume
         }
         else {
           assume(lowerLevelIsStrictSuperset(n, right)) // TODO : Remove assume
@@ -291,6 +299,162 @@ object SkipList {
       }
     }
   } ensuring (_ => lowerLevelIsSuperset(n, newDown))
+
+  //n in {s in superset such that s.value > n.value}
+  /*
+  def orderedSubsetOfSupersetIsStillSuperset(superSet: Node, superSetCut:Node, n: Node, cutoff: Int): Unit = {
+    require(isSkipList(superSet))
+    require(isSkipList(n))
+    require(isSkipNodeOfValue(n,cutoff))
+    require(isSkipNodeOfValue(superSetCut,cutoff))
+    require(isInRightSubtree(superSetCut, superSet))
+
+    n match {
+      case SkipNode(_,_,r,h)=>
+        r match {
+          case SkipNode(valueR,_,_,_) =>
+            assert(isInRightSubtree(valueR,superSetCut))
+          case Leaf => ()
+        }
+
+      case Leaf => () //cant happen by require
+    }
+  }.ensuring(_ => lowerLevelIsStrictSuperset(superSetCut, n))
+  */
+  def subsetRightInSupersetRight(subset: Node, superset: Node): Unit = {
+    require(isSkipList(superset))
+    require(isSkipList(subset))
+    require(size(superset)> 0)
+    require(size(subset)> 0)
+    require(isSubset(subset, superset))
+    (superset, subset) match {
+      case (x@SkipNode(superV,_,superR,_), 
+            y@SkipNode(subV,_,subR,_)) =>
+        sizeIsNonNegative(superR)
+        sizeIsNonNegative(subR)
+        if(superV > subV) () //shouldnt happen
+        else if (superV == subV) assert(isSubset(subR, superR))
+        else {
+          assert(superV < subV)
+          assert(isSubset(subset, superR))
+          rightIsSubsetOfNode(y)
+          assert(isSubset(subR, subset))
+          subsetTransitivity(subR, subset, superR)
+          assert(isSubset(subR, superR))
+        }
+      case (Leaf, _) => ()
+      case _ => ()
+    }
+  }
+
+  def subsetRightInSuperset(subset: SkipNode, superset: Node): Unit = {
+    require(isSkipList(superset))
+    require(isSkipList(subset))
+    require(size(superset)> 0)
+    require(size(subset)> 0)
+    require(isSubset(subset, superset))
+    decreases(size(subset) + size(superset))
+    (superset, subset) match {
+      case (sup@SkipNode(superV,_,superR,_), 
+            sub@SkipNode(subV,_,subR,_)) =>
+        sizeIsNonNegative(superR)
+        sizeIsNonNegative(subR)
+        sizeDecreasesToTheRight(sub)
+        if(superV > subV) () //shouldnt happen
+        else if (superV == subV) ()
+        else {
+          assert(superV < subV)
+          
+          assert(isSubset(subR, superR)) //TODO eq to subsetRightInSupersetRight
+          assert(isSubset(subR,superset))
+        }
+      case (Leaf, _) => ()
+      case _ => ()
+    }
+  }.ensuring(_ => isSubset(subset.right, superset))
+
+  //def subsetHeadNEQDecreasesSuperset(superset:Node, subset:Node): Un
+
+  def rightIsSubsetOfNode(node: SkipNode) : Unit = {
+    require(isSkipList(node))
+    require(size(node) >= 0)
+    sizeIsNonNegative(node.right)
+    subsetReflexivity(node.right)
+  }.ensuring(_ => isSubset(node.right, node))
+
+  def subsetReflexivity(n: Node): Unit = {
+    require(isSkipList(n))
+    require(size(n) >= 0)
+    n match { 
+      case SkipNode(v,_,r,_) => 
+        sizeIsNonNegative(r)
+        subsetReflexivity(r)
+        assert(isSubset(r,r))
+      case Leaf => 
+        assert(isSubset(Leaf,Leaf))
+    }
+  }.ensuring(_=> isSubset(n,n))
+
+  def subsetTransitivity(subsubset: Node, subset:Node, superset:Node): Unit = {
+    require(isSkipList(subsubset))
+    require(isSkipList(subset))
+    require(isSkipList(superset))
+    require(size(subsubset) >= 0)
+    require(size(subset) >= 0)
+    require(size(superset) >= 0)
+    require(isSubset(subset, superset))
+    require(isSubset(subsubset, subset))
+    decreases(size(subsubset) + size(subset) + size(superset))
+    (subsubset, subset) match {
+      case (ss@SkipNode(ssV,_,ssR,_),
+             s@SkipNode( sV,_, sR,_)) =>
+              sizeDecreasesToTheRight(ss)
+              sizeDecreasesToTheRight(s)
+              sizeIsNonNegative(ssR)
+              sizeIsNonNegative(sR)
+              if(ssV == sV){
+                //subset.r is subset of superset
+                subsetRightInSuperset(s, superset)
+                // subsubset.right is subset of subset.right
+                assert(isSubset(ssR, sR))
+
+                subsetTransitivity(ssR, sR, superset) //TODO
+                ()
+              }
+              else if(ssV > sV){
+                assert(isSubset(subsubset, sR))
+                //subset.r is subset of superset
+                subsetRightInSuperset(s, superset)
+                
+                subsetTransitivity(subsubset, sR, superset)
+                ()
+              }
+              else ()//doesnt happen
+      case (Leaf, _) =>
+      case _ =>
+    }
+  }.ensuring(_ => isSubset(subsubset, superset))
+
+  def isSubset(n: Node, of: Node): Boolean = {
+    require(isSkipList(n))
+    require(isSkipList(of))
+    require(size(n) >= 0)
+    require(size(of) >= 0)
+    decreases(size(n) + size(of))
+    (n, of) match {
+      case (x@SkipNode(v1,_,r1,_),
+            y@SkipNode(v2,_,r2,_)) =>
+        sizeDecreasesToTheRight(x)
+        sizeDecreasesToTheRight(y)
+        sizeIsNonNegative(r1)
+        sizeIsNonNegative(r2)
+        if(v1 == v2) isSubset(r1, r2) //match
+        else if(v1 > v2) isSubset(x, r2) //further
+        else false //(v1 < v2) v1 not in superset
+      case (Leaf, _) => true
+      case _ => false
+    }
+  }
 
   def lowerLevelIsStrictSuperset(n: Node, lower: Node): Boolean = {
     n match {
