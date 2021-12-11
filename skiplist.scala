@@ -52,14 +52,14 @@ object SkipList {
   //         val lowerLeftmostNode = insert(down, k, insertHeight)
   //         assert(isRight(lowerLeftmostNode, k))
   //         assert(isSkipList(lowerLeftmostNode))
-
+         
   //         insertRight(t, k, lowerLeftmostNode) //insert right need new underlying level to update links to down nodes
   //       }
   //     }
   //     case Leaf => Leaf // Found a leaf (we are at level -1)
   //   }
   // }
-  
+   
   // Leftmost element from currentLevel
   def levelLeftmost(t: Node, level: BigInt): Node = {
     require(isSkipList(t))
@@ -144,7 +144,7 @@ object SkipList {
       }
     }
   }
-
+  
   def insertRightZeroHeight(n: SkipNode, k: Int): Node = {
     require(isSkipList(n))
     require(size(n) >= 0)
@@ -174,14 +174,46 @@ object SkipList {
     }
   }
 
-  def skipnodeToTheRightAlsoHasKeyToTheRight(n: Node, r: Node, k: Int): Unit = { // TODO : The proof
-    require(isSkipNode(n))
-    require(isSkipNodeOfValueAtMost(r, k))
+  def valueAtRightIsHigher(n:SkipNode,r:SkipNode): Unit = {
     require(isSkipList(n))
     require(isSkipList(r))
     require(isInRightSubtree(r, n))
-    require(isInRightSubtree(k, n))
-  } ensuring (_ => isInRightSubtree(k, r))
+    n.right match {
+      case Leaf => ()
+      case rN@SkipNode(value, down, right, height) => 
+        if (rN != r){
+          valueAtRightIsHigher(rN,r)
+        }
+    }
+  } ensuring (_ => n.value<r.value)
+
+  def skipnodeToTheRightAlsoHasKeyToTheRight(n: Node, r: Node, v: Int): Unit = {
+    require(isSkipNode(n))
+    require(isSkipNodeOfValueSmallerThan(r, v))
+    require(isSkipList(n))
+    require(isSkipList(r))
+    require(isInRightSubtree(r, n))
+    require(isInRightSubtree(v, n))
+    require(sizeRight(n) >= 0)
+    decreases(sizeRight(n))
+    n match {
+      case sN@SkipNode(value, down, right, height) => {
+        right match{
+          case sR@SkipNode(_, _, _, _) => {
+            if (sR != r){
+              r match {
+                case skipR@SkipNode(_,_,_,_) => {
+                  valueAtRightIsHigher(sR,skipR)
+                  sizeRightIsNonNegative(sN)
+                  skipnodeToTheRightAlsoHasKeyToTheRight(sR,skipR,v)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } ensuring (_ => isInRightSubtree(v, r))
 
   def plugLowerLevel(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Node = {
     require(isSkipList(oldCurrentLeftmost))
@@ -648,26 +680,33 @@ object SkipList {
   } ensuring (_ => isInTheList(b,remove(n,a)))
 
   // 7 - If sl is a skiplist and a is in sl, search(sl, a) returns Some(a) ===
-  def searchFindsElement(sl: SkipList, v:BigInt): Unit = {
-    require(isSkipList(sl))
-    require(isInTheList(v,sl))
-  } ensuring (_ => search(sl,v) == Some(v))
+    def searchFindsElement(sl: SkipList, v:BigInt): Unit = {
+      require(isSkipList(sl))
+      require(isInTheList(v,sl))
+    } ensuring (_ => search(sl,v) == Some(v))
 
-  def searchFindsElement(n: Node, v:BigInt): Unit = {
+  def searchFindsElement(n: Node, v:Int): Unit = {
     require(isSkipList(n))
     require(isInTheList(v,n))  
     n match {
       case Leaf => ()
       case SkipNode(value, down, right, height) => {
-        if(isInRightSubtree(v, right)){
-          (assume(isInRightSubtree(v, right)))
+        if (value == v){
+          ()
+        }
+        else if(isInRightSubtree(v, right)){
+          assert(isInRightSubtree(v, right))
+          decreases(sizeRight(n))
+          searchFindsElement(right, v)
+          //assume(nodeForIntInRightSubtree(v,n)!= None())
         } else {
           assume(isInTheList(v,down))
+          assume(search_(n,v) == Some(v))
 
         }
       }
     }
-  } ensuring (_ => search(n,v) == Some(v)
+  } ensuring (_ => search_(n,v) == Some(v))
   
   // 8 - If sl is a skiplist and a is not in sl, search(sl, a) returns None ==
   def searchFindsNone(sl: SkipList, v:BigInt): Unit = {
@@ -697,9 +736,9 @@ object SkipList {
 
   
   def elementOfSkipListIsSkipList(t: SkipNode): Unit = { // Is not used in proofs, but keep it there to make sure we don't break SkipList axioms
-  require(isSkipList(t))
-  assert(levelsAxiom(t.down))
-  assert(levelsAxiom(t.right))
+    require(isSkipList(t))
+    assert(levelsAxiom(t.down))
+    assert(levelsAxiom(t.right))
   } ensuring (_ => isSkipList(t.down) && isSkipList(t.right))
 
 
@@ -945,6 +984,8 @@ object SkipList {
   def isSkipNode(n: Node): Boolean = n match {case Leaf => false; case _ => true}
   def isSkipNodeOfValue(n: Node, k: Int): Boolean = n match {case SkipNode(k, _, _, _) => true; case _ => false}
   def isSkipNodeOfValueAtMost(n: Node, k: Int): Boolean = n match {case SkipNode(v, _, _, _) => v <= k; case _ => false}
+  def isSkipNodeOfValueSmallerThan(n: Node, k: Int): Boolean = n match {case SkipNode(v, _, _, _) => v < k; case _ => false}
+
   def isLeaf(n: Node): Boolean = !isSkipNode(n)
 
   def size(t: Node): BigInt = t match {
