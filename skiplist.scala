@@ -138,6 +138,7 @@ case object Leaf extends Node
     require(currentLevel >= 0)
     require(currentLevel == 0 || 
             (lowerLeftmost.isSkipNode && nodeHeight(lowerLeftmost) + 1 == currentLevel))
+    require(currentLevel > desiredHeight + 1 || isInRightSubtree(k, lowerLeftmost))
     decreases(nodeHeight(topLeftmost) + 1 - currentLevel)
     if (currentLevel > nodeHeight(topLeftmost)) {
       lowerLeftmost
@@ -156,29 +157,40 @@ case object Leaf extends Node
           if (currentLevel == 0) {
             val finalCurrentLeftmost = currentLeftmost match {
               case currentLeftmost@SkipNode(value, _, _, _) => {
+                lem_insertRightZeroHeightIsSkipList(currentLeftmost,k)
+                assume(isInRightSubtree(k,currentLeftmost)) //TODO remove assume, something like above lemma should do it
                 insertRightZeroHeight(currentLeftmost, k)
               }
             }
-            assume(finalCurrentLeftmost.isSkipList) //TODO remove assume
             assert(currentLevel <= nodeHeight(topLeftmost))
             insertUpwards(k, desiredHeight, topLeftmost, currentLevel+1, finalCurrentLeftmost)
           }
           else if (currentLevel <= desiredHeight) { // need to insert
             //plug lower level
             assert(lowerLeftmost.isSkipNode)
-            assume(lowerLevelIsSuperset(currentLeftmost, lowerLeftmost)) //TODO remove assume
+            // lowerLeftmost Superset currentleftmost.down Superset currentleftmost
+            /* //TODO remove next assume, might require new requires on lowerLeftMost
+            currentLeftmost match {
+              case currentLeftmost@SkipNode(value, down, _, _) =>
+                assert(lowerLevelIsSuperset(currentLeftmost, down))
+            }
+            */
+            assume(lowerLevelIsSuperset(currentLeftmost, lowerLeftmost))
             assert(nodeHeight(currentLeftmost) == nodeHeight(lowerLeftmost) + 1)
             val updatedCurrentLeftmost = plugLowerLevel(currentLeftmost, lowerLeftmost)
             //insert right
             val finalCurrentLeftmost = updatedCurrentLeftmost match {
               case updatedCurrentLeftmost@SkipNode(_, _, _, _) => 
                 assume(updatedCurrentLeftmost.isSkipList) //TODO remove assume, == plugLowerReturnsSkipList
-                assume(isInRightSubtree(k, updatedCurrentLeftmost.down)) // TODO remove assume, use transitivity
+                assert(isInRightSubtree(k, lowerLeftmost))
+                assume(updatedCurrentLeftmost.down == lowerLeftmost)
+                assert(isInRightSubtree(k, updatedCurrentLeftmost.down)) // TODO remove assume, use transitivity
 
                 insertRight(updatedCurrentLeftmost, k)
             }
             //insert up
             assume(finalCurrentLeftmost.isSkipList) //TODO remove == lem_insertRightIsSkipList
+            assume(isInRightSubtree(k, finalCurrentLeftmost)) //TODO remove == lem_insertRightContainsK
             assume(nodeHeight(finalCurrentLeftmost) == currentLevel) //TODO remove assume,  == lem_insertRightKeepsLevel
             insertUpwards(k, desiredHeight, topLeftmost, currentLevel+1, finalCurrentLeftmost)
           }
@@ -393,7 +405,7 @@ case object Leaf extends Node
   // Return true when a node target is in the subtree of a node of
   def isInRightSubtree(target: Node, of: Node): Boolean = {
     (target, of) match {
-      case (Leaf, Leaf) => false
+      case (Leaf, Leaf) => false 
       case (Leaf, _) => true
       case (_, Leaf) => false
       case (SkipNode(_, _, _, _), SkipNode(_, _, rOf, _)) => {
@@ -943,6 +955,40 @@ def findNewDown(t: Node, v: Int): Node = t match {
       case (Leaf, _) => ()
     }
   } ensuring (_ => isInRightSubtree(findNewDown(n, k), n))
+
+  def lem_insertRightZeroHeightIsSkipList(n: SkipNode, k: Int) : Unit = {
+    require(n.isSkipList)
+    require(n.value <= k)
+    require(nodeHeight(n) == 0)
+
+    if (n.value == k) ()
+    else {
+      n.right match {
+        case r@SkipNode(valueR, downR, rightR, heightR) => {
+          if (valueR <= k) {
+            sizeDecreasesToTheRight(n)
+
+            lem_insertRightZeroHeightIsSkipList(r, k)
+          }
+          else {
+            assert(insertRightZeroHeight(n, k).isSkipList)
+            //val newRight = SkipNode(k, Leaf, n.right, n.height) 
+            //SkipNode(n.value, n.down, newRight, n.height)
+          }
+        }
+        case Leaf => {
+          val newRight = SkipNode(k, Leaf, Leaf, n.height)
+          val ret = SkipNode(n.value, n.down, newRight, n.height)
+          assert(newRight.isSkipList)
+          assert(levelsAxiom(newRight))
+          assume(isInRightSubtree(newRight.down, ret.down)) //TODO this is wrong by deifnition of isInRightSubtree for Leaf-Leaf
+          assert(levelsAxiom(ret))
+          assert(ret.isSkipList)
+          assert(insertRightZeroHeight(n, k).isSkipList)
+        }
+      }
+    }
+  } ensuring ( _ => insertRightZeroHeight(n, k).isSkipList)
 
   
   // TODO looks like and alias for lowerLevelIsSuperset or equiv
