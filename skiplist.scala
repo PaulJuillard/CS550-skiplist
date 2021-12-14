@@ -245,6 +245,7 @@ object SkipList {
     require(nodeHeight(oldCurrentLeftmost) == nodeHeight(newLowerLeftmost) + 1)
     require(sizeRight(oldCurrentLeftmost) >= 0)
     decreases(sizeRight(oldCurrentLeftmost))
+
     (oldCurrentLeftmost, newLowerLeftmost) match {
       case (oldCurrentLeftmost@SkipNode(value, down, right, height), newLowerLeftmost@SkipNode(valueL, downL, rightL, heightL)) => {
         val newDown = findNewDown(newLowerLeftmost, value)
@@ -263,7 +264,9 @@ object SkipList {
               inRightSubtreeHasSameNodeHeight(newLowerLeftmost, newDown)
               sizeIsNonNegative(right)
               toTheRightIsStillSuperset(newLowerLeftmost, newDown, right, valueR)
+              assert(lowerLevelIsSuperset(right, newDown))
             }
+            assert(lowerLevelIsSuperset(right, newDown))
             SkipNode(value, newDown, plugLowerLevel(right, newDown), height)
           }
           case Leaf => SkipNode(value, newDown, Leaf, height)
@@ -271,6 +274,7 @@ object SkipList {
       }
     }
   }
+
 
   def toTheRightIsStillSuperset(newLowerLeftmost: Node, newDown: Node, n: Node, v: Int): Unit = {
     require(isSkipList(n))
@@ -366,6 +370,7 @@ object SkipList {
     }
   }
 
+  
   def newDownIsInRightSubtreeOfOld(n: Node, k: Int): Unit = {
     require(isSkipList(n))
     require(isSkipNodeOfValueSmallerThan(n, k))
