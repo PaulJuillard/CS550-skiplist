@@ -207,6 +207,19 @@ object SkipList {
     }
   } ensuring (_ => n.value<r.value)
 
+  def valueAtRightIsHigher(n: SkipNode, r: Int): Unit = {
+    require(isSkipList(n))
+    require(isInRightSubtree(r, n))
+    n.right match {
+      case Leaf => ()
+      case rN@SkipNode(value, down, right, height) => 
+        if (rN.value != r){
+          valueAtRightIsHigher(rN,r)
+        }
+    }
+  } ensuring (_ => n.value<r)
+
+
   def skipnodeToTheRightAlsoHasKeyToTheRight(n: Node, r: Node, v: Int): Unit = {
     require(isSkipNode(n))
     require(isSkipNodeOfValueSmallerThan(r, v))
@@ -311,6 +324,62 @@ object SkipList {
     }
   }
 
+
+  def getValueOrElse(n: Node): Int = {
+    n match {
+      case Leaf => -1
+      case SkipNode(value, down, right, height) => value
+    }
+  }
+
+  def higherRootHasLowerValue(n: Node, lower: Node): Unit = {
+    require(isSkipNode(n))
+    require(isSkipNode(lower))
+    require(isSkipList(n))
+    require(isSkipList(lower))
+    require(nodeHeight(n) > 0)
+    require(nodeHeight(lower)+1 == nodeHeight(n))
+    require(lowerLevelIsSuperset(n,lower))
+    (n, lower) match {
+      case (high@SkipNode(value, down, right, _), low@SkipNode(valueL, _, _, _)) => {
+        if(value!=valueL){
+          assert(lowerLevelIsStrictSuperset(high, lower))
+          down match {
+            case d@SkipNode(vD, _, _, _) => {
+              assert(value==vD)
+              assert(isInRightSubtree(vD, low))
+              valueAtRightIsHigher(low,vD)
+            }
+          }          
+        }
+      }
+    }
+  } ensuring (_ => getValueOrElse(n)>= getValueOrElse(lower))
+
+  def lowerIsSuperSet(n: Node, lower: Node): Unit = {
+    require(isSkipNode(n))
+    require(isSkipNode(lower))
+    require(isSkipList(n))  
+    require(isSkipList(lower))
+    require(nodeHeight(n) > 0)
+    require(nodeHeight(lower)+1 == nodeHeight(n))
+    require(getValueOrElse(n) == getValueOrElse(lower))
+    (n, lower) match {
+      case (nS@SkipNode(value, down, right, _), lS@SkipNode(valueL, _, _, _)) => {
+        assert(isEqualOrInRightSubtree(value,lS))
+        right match {
+          case rS@SkipNode(vR, dR, rR, hR) => 
+            higherLevelIsSubsetofLowerOne(vR,lS)
+            lowerIsSuperSet(rS,)
+        }
+      }
+    }
+  } ensuring (_ => lowerLevelIsSuperset(n,n))
+
+  //  def higherLevelIsSubsetofLowerOne(n: SkipNode, x: SkipNode): Unit = {
+  //} ensuring (_ => isInRightSubtree(x.down, n.down))
+
+
   def newDownIsInRightSubtreeOfOld(n: Node, k: Int): Unit = {
     require(isSkipList(n))
     require(isSkipNodeOfValueSmallerThan(n, k))
@@ -381,7 +450,38 @@ object SkipList {
     }
   } ensuring (n.height == x.height)
 
-  def plugLowerLevelReturnsSkipList(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Unit = {
+  def hasThatLowerTree(n : Node, lower: Node): Boolean = {
+    n match {
+      case SkipNode(_, downA, _, _) => return downA == lower
+      case _ => return false
+    }
+  }
+
+  def lowerIsASubsetOf(n : Node, lower: Node): Boolean = {
+    (n,lower) match {
+      case (SkipNode(_, downA, _, _), lS@SkipNode(_, _, _, _))  => {
+        downA match {
+          case dS@SkipNode(_,_, _, _) => return lowerLevelIsSuperset(dS,lS)
+          case _ => true
+        }
+      }
+      case _ => return false
+    }
+  }
+
+  //def hasThatLowerTreeBis(n : Node, lower: Node): Node = {
+  //  n match {
+  //    case SkipNode(_, downA, _, _) => downA match {
+  //      case SkipNode(value, down, right, height) => 
+  //        return value == lower.value
+  //      case Leaf => return Leaf
+  //    }
+  //    case _ => return Leaf
+  //  }
+  //}
+
+
+  /*def plugLowerLevelDoesNotModifiesDownSubtree(oldCurrentLeftmost: SkipNode, newLowerLeftmost: SkipNode): Unit = {
     require(isSkipList(oldCurrentLeftmost))
     require(isSkipList(newLowerLeftmost))
     require(isSkipNode(oldCurrentLeftmost))
@@ -389,10 +489,95 @@ object SkipList {
     require(nodeHeight(oldCurrentLeftmost) > 0)
     require(nodeHeight(oldCurrentLeftmost) == nodeHeight(newLowerLeftmost) + 1)
     require(lowerLevelIsSuperset(oldCurrentLeftmost, newLowerLeftmost))
+    //require(oldCurrentLeftmost.value == newLowerLeftmost.value)  // TODO : KEEP THAT ?
     sizeRightIsNonNegative(oldCurrentLeftmost)
-    assume(isSkipList(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost))) // TODO : Remove assume
-  } ensuring (isSkipList(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
+    higherRootHasLowerValue(oldCurrentLeftmost,newLowerLeftmost)
+    (oldCurrentLeftmost,newLowerLeftmost) match {
+      case (o@SkipNode(vO,dO,rO,hO), n@SkipNode(vN,dN,rN,hN)) => {
+        assert(vO>=vN)
+        plugLowerLevel(o,n) match {
+          case p@SkipNode(vP, dP, rP, hP) => {
+            if(vO == vN){
+              assert(hasThatLowerTree(plugLowerLevel(o,n),n))
+              dP match {
+                case dPS@SkipNode(value, down, right, height) => 
+                  assert(lowerLevelIsSuperset(dPS,dPS))
+                  
+              }
+              //assume(lowerLevelIsSuperset(plugLowerLevel(oldCurrentLeftmost,newLowerLeftmost),newLowerLeftmost))
+            } else {
+              assume(lowerLevelIsSuperset(plugLowerLevel(oldCurrentLeftmost,newLowerLeftmost),newLowerLeftmost))
+            }
+          }
+        }
+      }
+    }
+  //} ensuring (hasThatLowerTree(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost) ,newLowerLeftmost))
+  } ensuring (lowerLevelIsSuperset(plugLowerLevel(oldCurrentLeftmost,newLowerLeftmost),newLowerLeftmost))
 
+  def hasSameValue(a: Node, b: Node): Boolean = {
+    (a,b) match {
+      case (aS@SkipNode(vA,_,_,_),bS@SkipNode(vB,_,_,_)) => return vA == vB
+      case _ => return false
+    }
+  }
+
+  def plugLowerLevelReturnsSkipList(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Unit = {
+    require(isSkipList(oldCurrentLeftmost))
+    require(isSkipList(newLowerLeftmost))
+    require(isSkipNode(oldCurrentLeftmost))
+    require(isSkipNode(newLowerLeftmost))
+    require(nodeHeight(oldCurrentLeftmost) > 0)
+    //require(hasSameValue(oldCurrentLeftmost,newLowerLeftmost)) // TODO : KEEP THAT ?
+    require(nodeHeight(oldCurrentLeftmost) == nodeHeight(newLowerLeftmost) + 1)
+    require(lowerLevelIsSuperset(oldCurrentLeftmost, newLowerLeftmost))
+    sizeRightIsNonNegative(oldCurrentLeftmost)
+    (oldCurrentLeftmost,newLowerLeftmost) match {
+      case (o@SkipNode(vO,dO,rO,hO), n@SkipNode(vN,dN,rN,hN)) => {
+        higherRootHasLowerValue(o,n)
+        assert(vO>=vN)
+        if (vO == vN){
+          plugLowerLevel(o,n) match {
+            case p@SkipNode(vP, dP, rP, hP) => {
+              assert(hasNonNegativeHeight (p))
+              assert(heightDecreasesDown  (p))
+              assert(increasesToTheRight  (p))
+              assert(levelsAxiom          (p))
+              assume(isSkipList(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
+            }
+          }
+        }
+        if (vO > vN){
+          rN match {
+            case rNS@SkipNode(value, down, right, height) => {
+              //assert(plugLowerLevel(o,n) == plugLowerLevel(o,rNS))
+              assume(isSkipList(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
+            }
+            case Leaf => ()
+          }
+        
+        } /*else {
+          assert(vO == vN)
+          plugLowerLevel(o,n) match {
+            case p@SkipNode(vP, dP, rP, hP) => {
+              plugLowerLevelDoesNotModifiesDownSubtree(o,n)
+              assert(hasThatLowerTree(p ,n))
+              assert(isSkipList(dP))
+              //assert(hasNonNegativeHeight (p))
+              //assert(heightDecreasesDown  (p))
+              //assert(increasesToTheRight  (p))
+              //assert(levelsAxiom          (p))
+
+            }
+            case Leaf => ()
+          }
+        }*/
+      }
+    }
+    
+     // TODO : Remove assume
+  } ensuring (isSkipList(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
+*/
   // boil node up to level newHeight
   def increaseHeight(n: Node, newHeight:BigInt): Node = {
     require(isSkipList(n))
@@ -576,7 +761,7 @@ object SkipList {
       }
     }
   }
-
+  
   def isInRightSubtree(target: Int, of: Node): Boolean = {
     of match {
       case SkipNode(_, _, r@SkipNode(vRight, _, _, _), _) => {
@@ -585,6 +770,19 @@ object SkipList {
       case _ => false
     }
   }
+
+  def isEqualOrInRightSubtree(target: Node, of: Node): Boolean = {
+    return (target == of || isInRightSubtree(target,of))
+  }
+
+  def isEqualOrInRightSubtree(target: Int, of: Node): Boolean = {
+    of match {
+      case SkipNode(v,_,_,_) => (target == v || isInRightSubtree(target,of))
+      case _ => false
+    }
+  }
+
+
 
   def levelsAxiom(t: Node): Boolean = {
     t match {
