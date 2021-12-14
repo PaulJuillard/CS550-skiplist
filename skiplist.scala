@@ -257,10 +257,11 @@ object SkipList {
             nodeHeightisNodeHeight(right)
             if (value != valueL) {
               newDownReturnsSkipList(newLowerLeftmost, value)
-              isInRightSubtreeImpliesSelfValueIsHigher(newLowerLeftmost, value)
+              isInRightSubtreeImpliesSelfValueIsLower(newLowerLeftmost, value)
               newDownReturnsSkipNodeOfValue(newLowerLeftmost, value)
               newDownIsInRightSubtreeOfOld(newLowerLeftmost, value)
               inRightSubtreeHasSameNodeHeight(newLowerLeftmost, newDown)
+              sizeIsNonNegative(right)
               toTheRightIsStillSuperset(newLowerLeftmost, newDown, right, valueR)
             }
             SkipNode(value, newDown, plugLowerLevel(right, newDown), height)
@@ -278,19 +279,73 @@ object SkipList {
     require(isInRightSubtree(newDown, newLowerLeftmost))
     require(isSkipNodeOfValue(n, v))
     require(isSkipNodeOfValueSmallerThan(newDown, v))
-    newLowerLeftmost match {
-      case SkipNode(value, down, right, height) => {
-        if (newDown == right) {
-          assume(lowerLevelIsSuperset(n, newDown)) // TODO : Remove assume
-        }
-        else {
-          assume(lowerLevelIsStrictSuperset(n, right)) // TODO : Remove assume
-          toTheRightIsStillSuperset(right, newDown, n, v)
-          assume(lowerLevelIsSuperset(n, newDown)) // TODO : Remove assume
+    require(size(n) >= 0)
+    decreases(size(n))
+    (newDown, n) match {
+      case (newDown@SkipNode(value, down, right, height), n@SkipNode(valueN, _, rightN, _)) => {
+        isInRightSubtreeInequality(newLowerLeftmost, newDown, valueN)
+        sizeIsNonNegative(rightN)
+        sizeDecreasesToTheRight(n)
+        rightN match {
+          case rightN@SkipNode(valueR, _, _, _) => toTheRightIsStillSuperset(newLowerLeftmost, newDown, rightN, valueR)
+          case Leaf => ()
         }
       }
     }
   } ensuring (_ => lowerLevelIsSuperset(n, newDown))
+
+  def isInRightSubtreeInequality(n: Node, a: Node, v: Int): Unit = {
+    require(isSkipList(n))
+    require(isInRightSubtree(a, n))
+    require(isInRightSubtree(v, n))
+    require(isSkipNodeOfValueSmallerThan(a, v))
+    n match {
+      case SkipNode(_, _, right, _) => {
+        if (right != a) {
+          right match {
+            case SkipNode(value, _, _, _) => {
+              rightSubtreeDoesNotSkipValues(n, a, v)
+              isInRightSubtreeInequality(right, a, v)
+            }
+          }
+        }
+      }
+    }
+  } ensuring (_ => isInRightSubtree(v, a))
+
+  def rightSubtreeDoesNotSkipValues(n: Node, a: Node, v: Int): Unit = {
+    require(isSkipList(n))
+    require(isInRightSubtree(a, n))
+    require(isInRightSubtree(v, n))
+    require(isSkipNodeOfValueSmallerThan(a, v))
+    require(rightNodeIsNot(n, a))
+    n match {
+      case n@SkipNode(_, _, right, _) => (right, a) match {
+        case (right@SkipNode(value, _, _, _), a@SkipNode(valueA, _, _, _)) => {
+          isInRightSubtreeImpliesValueIsAlsoIn(right, a)
+          sizeRightIsNonNegative(right)
+          isInRightSubtreeImpliesSelfValueIsLower(right, valueA)
+        }
+      }
+    }
+  } ensuring (_ => rightNodeHasValueLessThan(n, v))
+
+  def rightNodeHasValueLessThan(n: Node, v: Int): Boolean = {
+    n match {
+      case SkipNode(_, _, right, _) => right match {
+        case SkipNode(value, _, _, _) => value < v
+        case Leaf => false
+      }
+      case Leaf => false
+    }
+  }
+
+  def rightNodeIsNot(n: Node, a: Node): Boolean = {
+    n match {
+      case SkipNode(_, _, right, _) => right != a
+      case Leaf => false
+    }
+  }
 
   def lowerLevelIsStrictSuperset(n: Node, lower: Node): Boolean = {
     n match {
@@ -1043,8 +1098,6 @@ object SkipList {
 
   // Proof that isInRightSubtree(node, node) implies isInRightSubtree(v, node)
   def isInRightSubtreeImpliesValueIsAlsoIn(n: SkipNode, target: SkipNode): Unit = {
-    require(isSkipList(n))
-    require(isSkipList(target))
     require(isInRightSubtree(target, n))
     if (target != n.right) {
       n.right match {
@@ -1053,7 +1106,7 @@ object SkipList {
     }
   } ensuring (_ => isInRightSubtree(target.value, n))
 
-  def isInRightSubtreeImpliesSelfValueIsHigher(n: SkipNode, k: Int): Unit = {
+  def isInRightSubtreeImpliesSelfValueIsLower(n: SkipNode, k: Int): Unit = {
     require(isSkipList(n))
     require(isInRightSubtree(k, n))
     require(sizeRight(n) >= 0)
@@ -1061,7 +1114,7 @@ object SkipList {
     n.right match {
       case right@SkipNode(value, _, _, _) => if (value != k) {
         sizeRightIsNonNegative(right)
-        isInRightSubtreeImpliesSelfValueIsHigher(right, k)
+        isInRightSubtreeImpliesSelfValueIsLower(right, k)
       }
     }
   } ensuring (_ => n.value < k)
