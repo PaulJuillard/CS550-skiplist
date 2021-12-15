@@ -2,6 +2,7 @@ import stainless.math.{max, min, wrapping}
 import stainless.lang._
 import stainless.annotation._
 import stainless.collection._
+import stainless.proof.check
 
 // TODO rename inRightSubtree by isRight because we dont go down
 
@@ -127,11 +128,12 @@ case object Leaf extends Node
   //   }
   // }
 
-  def insertUpwards(k: Int, desiredHeight: BigInt, topLeftmost: Node, currentLevel: BigInt, lowerLeftmost: Node): Node = {
+  def insertUpwards(k: Int, desiredHeight: BigInt, topLeftmost: Node, currentLeftmost: Node, currentLevel: BigInt, lowerLeftmost: Node): Node = {
     // insertRight in levels 0 to maxHeight
     // if desiredHeight is lower than level, simply updates links to the new subtree
     require(topLeftmost.isSkipList)
     require(lowerLeftmost.isSkipList)
+    require(currentLeftmost.isSkipList)
     require(topLeftmost.hasValue(Int.MinValue))
     require(desiredHeight >= 0)
     require(currentLevel <= nodeHeight(topLeftmost) + 1)
@@ -139,73 +141,49 @@ case object Leaf extends Node
     require(currentLevel == 0 || 
             (lowerLeftmost.isSkipNode && nodeHeight(lowerLeftmost) + 1 == currentLevel))
     require(currentLevel > desiredHeight + 1 || isInRightSubtree(k, lowerLeftmost))
+    require(k > Int.MinValue)
+    require(nodeHeight(currentLeftmost) == currentLevel)
+    require(isLowerOf(currentLeftmost, topLeftmost))
+    require(lowerLevelIsSuperset(currentLeftmost, lowerLeftmost))
     decreases(nodeHeight(topLeftmost) + 1 - currentLevel)
+
     if (currentLevel > nodeHeight(topLeftmost)) {
       lowerLeftmost
     }
     else {
-      assert(currentLevel <= nodeHeight(topLeftmost))
       topLeftmost match {
         case topLeftmost@SkipNode(_,_,_,_) => {
-          
-          val currentLeftmost = levelLeftmost(topLeftmost, currentLevel)
-          lem_levelLeftmostIsSkipList(topLeftmost, currentLevel)
-          lem_levelLeftmostHasCorrectHeight(topLeftmost, currentLevel)
-          lem_levelLeftmostIsMinInt(topLeftmost, currentLevel)
-          assert(currentLeftmost.isSkipNode)
-
           if (currentLevel == 0) {
             val finalCurrentLeftmost = currentLeftmost match {
               case currentLeftmost@SkipNode(value, _, _, _) => {
-                lem_insertRightZeroHeightIsSkipList(currentLeftmost,k)
-                assume(isInRightSubtree(k,currentLeftmost)) //TODO remove assume, something like above lemma should do it
+                // lem_insertRightZeroHeightIsSkipList(currentLeftmost,k)
+                // lem_insertRightZeroHeightContainsK(currentLeftmost,k)
                 insertRightZeroHeight(currentLeftmost, k)
               }
             }
-            assert(currentLevel <= nodeHeight(topLeftmost))
-            insertUpwards(k, desiredHeight, topLeftmost, currentLevel+1, finalCurrentLeftmost)
+            val nextCurrentLeftmost = levelLeftmost(topLeftmost, currentLevel)
+            insertUpwards(k, desiredHeight, topLeftmost, nextCurrentLeftmost, currentLevel+1, finalCurrentLeftmost)
           }
           else if (currentLevel <= desiredHeight) { // need to insert
             //plug lower level
-            assert(lowerLeftmost.isSkipNode)
-            // lowerLeftmost Superset currentleftmost.down Superset currentleftmost
-            /* //TODO remove next assume, might require new requires on lowerLeftMost
-            currentLeftmost match {
-              case currentLeftmost@SkipNode(value, down, _, _) =>
-                assert(lowerLevelIsSuperset(currentLeftmost, down))
-            }
-            */
-            assume(lowerLevelIsSuperset(currentLeftmost, lowerLeftmost))
-            assert(nodeHeight(currentLeftmost) == nodeHeight(lowerLeftmost) + 1)
             val updatedCurrentLeftmost = plugLowerLevel(currentLeftmost, lowerLeftmost)
             //insert right
             val finalCurrentLeftmost = updatedCurrentLeftmost match {
-              case updatedCurrentLeftmost@SkipNode(_, _, _, _) => 
-                assume(updatedCurrentLeftmost.isSkipList) //TODO remove assume, == plugLowerReturnsSkipList
-                assert(isInRightSubtree(k, lowerLeftmost))
-                assume(updatedCurrentLeftmost.down == lowerLeftmost)
-                assert(isInRightSubtree(k, updatedCurrentLeftmost.down)) // TODO remove assume, use transitivity
-
-                insertRight(updatedCurrentLeftmost, k)
+              case updatedCurrentLeftmost@SkipNode(_, _, _, _) => insertRight(updatedCurrentLeftmost, k)
             }
             //insert up
-            assume(finalCurrentLeftmost.isSkipList) //TODO remove == lem_insertRightIsSkipList
-            assume(isInRightSubtree(k, finalCurrentLeftmost)) //TODO remove == lem_insertRightContainsK
-            assume(nodeHeight(finalCurrentLeftmost) == currentLevel) //TODO remove assume,  == lem_insertRightKeepsLevel
-            insertUpwards(k, desiredHeight, topLeftmost, currentLevel+1, finalCurrentLeftmost)
+            val nextCurrentLeftmost = levelLeftmost(topLeftmost, currentLevel)
+            insertUpwards(k, desiredHeight, topLeftmost, nextCurrentLeftmost, currentLevel+1, finalCurrentLeftmost)
           }
           else if (currentLevel == desiredHeight + 1) {
-            assert(nodeHeight(lowerLeftmost) >= 0)
-            assert(lowerLeftmost.isSkipNode)
-            assume(lowerLevelIsSuperset(currentLeftmost, lowerLeftmost)) //TODO remove assume
-
             val updatedCurrentLeftmost = plugLowerLevel(currentLeftmost, lowerLeftmost)
             assume(updatedCurrentLeftmost.isSkipList) //TODO remove assume, == plugLowerReturnsSkipList
-            assume(nodeHeight(updatedCurrentLeftmost) == currentLevel) //TODO remove assume, == plugLowerKeepsHeight
-            insertUpwards(k, desiredHeight, topLeftmost, currentLevel+1, updatedCurrentLeftmost)
+            val nextCurrentLeftmost = levelLeftmost(topLeftmost, currentLevel)
+            insertUpwards(k, desiredHeight, topLeftmost, nextCurrentLeftmost, currentLevel+1, updatedCurrentLeftmost)
           }
           else { // just recurse to top
-            insertUpwards(k, desiredHeight, topLeftmost, currentLevel+1, currentLeftmost)
+            val nextCurrentLeftmost = levelLeftmost(topLeftmost, currentLevel)
+            insertUpwards(k, desiredHeight, topLeftmost, nextCurrentLeftmost, currentLevel+1, currentLeftmost)
           }
         }
       }
@@ -972,34 +950,38 @@ def findNewDown(t: Node, v: Int): Node = t match {
     require(n.value <= k)
     require(nodeHeight(n) == 0)
 
-    if (n.value == k) ()
-    else {
+    if (n.value != k) {
       n.right match {
         case r@SkipNode(valueR, downR, rightR, heightR) => {
           if (valueR <= k) {
             sizeDecreasesToTheRight(n)
-
             lem_insertRightZeroHeightIsSkipList(r, k)
-          }
-          else {
-            assert(insertRightZeroHeight(n, k).isSkipList)
-            //val newRight = SkipNode(k, Leaf, n.right, n.height) 
-            //SkipNode(n.value, n.down, newRight, n.height)
           }
         }
         case Leaf => {
           val newRight = SkipNode(k, Leaf, Leaf, n.height)
           val ret = SkipNode(n.value, n.down, newRight, n.height)
-          assert(newRight.isSkipList)
-          assert(levelsAxiom(newRight))
-          assume(isInRightSubtree(newRight.down, ret.down)) //TODO this is wrong by deifnition of isInRightSubtree for Leaf-Leaf
-          assert(levelsAxiom(ret))
-          assert(ret.isSkipList)
-          assert(insertRightZeroHeight(n, k).isSkipList)
+          check(levelsAxiom(newRight))
+          check(levelsAxiom(ret))
         }
       }
     }
   } ensuring ( _ => insertRightZeroHeight(n, k).isSkipList)
+
+  def lem_insertRightZeroHeightContainsK(n: SkipNode, k: Int) : Unit = {
+    require(n.isSkipList)
+    require(n.value < k)
+    require(nodeHeight(n) == 0)
+    n.right match {
+      case r@SkipNode(valueR, downR, rightR, heightR) => {
+        if (valueR < k) {
+          sizeDecreasesToTheRight(n)
+          lem_insertRightZeroHeightContainsK(r, k)
+        }
+      }
+      case Leaf => ()
+    }
+  } ensuring ( _ => isInRightSubtree(k,insertRightZeroHeight(n, k)))
 
   
   // TODO looks like and alias for lowerLevelIsSuperset or equiv
@@ -1364,7 +1346,7 @@ def lem_newDownReturnsSkipNodeOfValue(n: Node, v: Int): Unit = {
     require(level >= 0)
     require(level <= nodeHeight(t))
     decreases(nodeHeight(t) - level)
-    t match {
+    val res: Node = t match {
       case sn@SkipNode(value,down,_,height) =>
         assert(height >= level)
         if (height > level) {
@@ -1375,69 +1357,8 @@ def lem_newDownReturnsSkipNodeOfValue(n: Node, v: Int): Unit = {
           sn
         }
     }
-  }
-
-def lem_levelLeftmostIsSkipList(top: Node, level: BigInt): Unit = {
-  require(top.isSkipList)
-  require(top.hasValue(Int.MinValue))
-  require(level >= 0)
-  require(level <= nodeHeight(top))
-  decreases(nodeHeight(top) - level)
-
-  top match {
-      case sn@SkipNode(value,down,_,height) =>
-        assert(height >= level)
-        if (height > level) {
-          lem_levelLeftmostIsSkipList(down, level)
-        }
-        else {
-          assert(height == level)
-          assert(sn.isSkipList)
-        }
-  }
-
-} ensuring (_ => levelLeftmost(top, level).isSkipList)
-
-def lem_levelLeftmostHasCorrectHeight(top: Node, level: BigInt): Unit = {
-  require(top.isSkipList)
-  require(top.hasValue(Int.MinValue))
-  require(level >= 0)
-  require(level <= nodeHeight(top))
-  decreases(nodeHeight(top) - level)
-
-  top match {
-    case sn@SkipNode(value,down,_,height) =>
-      assert(height >= level)
-      if (height > level) {
-        lem_levelLeftmostHasCorrectHeight(down, level)
-      }
-      else {
-        assert(height == level)
-      }
-  }
-
-} ensuring (_ => nodeHeight(levelLeftmost(top, level)) == level)
-
-def lem_levelLeftmostIsMinInt(top: Node, level: BigInt): Unit = {
-  require(top.isSkipList)
-  require(top.hasValue(Int.MinValue))
-  require(level >= 0)
-  require(level <= nodeHeight(top))
-  decreases(nodeHeight(top) - level)
-
-  top match {
-    case sn@SkipNode(value,down,_,height) =>
-      assert(height >= level)
-      if (height > level) {
-        lem_levelLeftmostIsMinInt(down, level)
-      }
-      else {
-        assert(value==Int.MinValue)
-      }
-  }
-
-} ensuring (_ => levelLeftmost(top, level).hasValue(Int.MinValue))
-
+    res
+  } ensuring (res => res.isSkipList && res.hasValue(Int.MinValue) && res.hasHeight(level))
 //_____________________________________________ HEIGHT proofs and lemmas
   // All nodes in skipList have their height upper bounded
   def hasMaxHeight(sl: SkipList): Boolean = { 
