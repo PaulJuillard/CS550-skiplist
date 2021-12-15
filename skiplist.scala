@@ -493,7 +493,14 @@ def findNewDown(t: Node, v: Int): Node = t match {
   def levelsAxiom(t: Node): Boolean = {
     t match {
       case SkipNode(value, down, right, height) => right match {
-        case SkipNode(_, downR, _, _) => levelsAxiom(down) && levelsAxiom(right) && isInRightSubtree(downR, down)
+        case SkipNode(_, downR, _, _) => {
+          if (down.isLeaf) {
+            levelsAxiom(down) && levelsAxiom(right) && downR.isLeaf
+          }
+          else {
+            levelsAxiom(down) && levelsAxiom(right) && isInRightSubtree(downR, down)
+          }
+        }
         case Leaf => levelsAxiom(down)
       }
       case Leaf => true
@@ -664,7 +671,7 @@ def findNewDown(t: Node, v: Int): Node = t match {
         }
       }
     }
-  } ensuring (_ => isInRightSubtree(x.down, n.down))
+  } ensuring (_ => (n.down.isLeaf && x.down.isLeaf) || isInRightSubtree(x.down, n.down))
 
   def higherLevelIsSubsetofLowerOne(v: Int, n: SkipNode): Unit = {
     require(n.isSkipList)
@@ -674,18 +681,22 @@ def findNewDown(t: Node, v: Int): Node = t match {
       case r@SkipNode(valueR, downR, _, _) => {
         if (v != valueR) {
           higherLevelIsSubsetofLowerOne(v, r)
-          (r.down, n.down) match {
-            case (rD@SkipNode(_, _, _, _), nD@SkipNode(_, _, _, _)) => lem_isInRightSubtreeTransitive(nD, rD, v)
+          if (n.down.isSkipNode) {
+            (r.down, n.down) match {
+              case (rD@SkipNode(_, _, _, _), nD@SkipNode(_, _, _, _)) => lem_isInRightSubtreeTransitive(nD, rD, v)
+            }
           }
         }
         else {
-          (r.down, n.down) match {
-            case (rD@SkipNode(_, _, _, _), nD@SkipNode(_, _, _, _)) => lem_isInRightSubtreeImpliesValueIsAlsoIn(nD, rD)
+          if (n.down.isSkipNode) {
+            (r.down, n.down) match {
+              case (rD@SkipNode(_, _, _, _), nD@SkipNode(_, _, _, _)) => lem_isInRightSubtreeImpliesValueIsAlsoIn(nD, rD)
+            }
           }
         }
       }
     }
-  } ensuring (_ => isInRightSubtree(v, n.down))
+  } ensuring (_ => n.down.isLeaf || isInRightSubtree(v, n.down))
 
 /*  
    1 - If sl is a skiplist, insert(sl, a) is also a skiplist ==============
@@ -916,7 +927,7 @@ def findNewDown(t: Node, v: Int): Node = t match {
               assert(isInRightSubtree(vD, low))
               lem_valueAtRightIsHigher(low,vD)
             }
-          }          
+          }
         }
       }
     }
@@ -1074,16 +1085,18 @@ def findNewDown(t: Node, v: Int): Node = t match {
     require(n.isSkipList)
     require(x.isSkipList)
     require(isInRightSubtree(x, n))
-    require(nodeHeight(n) >= 0)
     decreases(nodeHeight(n))
     n match {
       case n@SkipNode(_, down, right, _) => x match {
         case x@SkipNode(_, downR, rightR, _) => {
           lem_inRightSubtreeImpliesLowerMeasure(n, x)
           higherLevelIsSubsetofLowerOne(n, x)
-          lem_sizeAtRightIsLower(down, downR)
           down match {
-            case (down@SkipNode(_, _, _, _)) => lem_sizeSkipNodeIsPositive(down)
+            case (down@SkipNode(_, _, _, _)) => {
+              lem_sizeAtRightIsLower(down, downR)
+              lem_sizeSkipNodeIsPositive(down)
+            }
+            case Leaf => ()
           }
         }
         case Leaf => ()
