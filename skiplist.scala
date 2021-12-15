@@ -412,31 +412,30 @@ case object Leaf extends Node
   }
 
 //_____________________________________________ UTILS
-
-  def findNewDown(t: Node, v: Int): Node = t match {
-    case SkipNode(value, down, right, height) => 
-      if (value == v) {t}
-      else {findNewDown(right, v)}
-      case Leaf => Leaf
-  }
+def findNewDown(t: Node, v: Int): Node = t match {
+  case SkipNode(value, down, right, height) => 
+    if (value == v) {t}
+    else {findNewDown(right, v)}
+    case Leaf => Leaf
+}
   
 //__________________________________________________________AXIOMS______________________________________________________
 
   // Return true when the given Skiplist is indeed a skiplist given the previous axioms
   def isASkipList(sl: SkipList): Boolean = {
-    if (!headIsMinInt(sl)) {false}
-    else if (hasNonNegativeHeight(sl.head)) {
-      heightDecreasesDown(sl.head) && increasesToTheRight(sl.head) && levelsAxiom(sl.head)
-    }
-    else {false}
+    headIsMinInt(sl) && 
+    hasNonNegativeHeight(sl.head) && 
+    heightDecreasesDown(sl.head) && 
+    increasesToTheRight(sl.head) && 
+    levelsAxiom(sl.head)
   }
 
   // Return true when the given node represent a skiplist (exept for the head condition)
   def isASkipList(t: Node): Boolean = {
-    if (hasNonNegativeHeight(t)) {
-      heightDecreasesDown(t) && increasesToTheRight(t) && levelsAxiom(t)
-    }
-    else {false}
+    hasNonNegativeHeight(t) &&
+    heightDecreasesDown(t) && 
+    increasesToTheRight(t) && 
+    levelsAxiom(t)
   }
 
   // Return true when the head of the given skiplist has theBigInt.MinValue value and has a height smaller than the max height
@@ -502,10 +501,9 @@ case object Leaf extends Node
   }
   
   //_________________________________________________ OTHER STRUCTURAL PROPERTIES __________________________________________
-  // TODO/NOTE many of these where moved out of context and need requires to be general
+  // TODO/NOTE many of these were moved out of context and need requires to be general
 
-   //_____________________________________________ GETTERS
-  
+  //_____________________________________________ GETTERS
   def isInTheList(target: Int, of : Node): Boolean = of match {
     case SkipNode(value, down, right, height) => isInRightSubtree(target,of) || isInTheList(target,down)
     case Leaf => false
@@ -525,18 +523,6 @@ case object Leaf extends Node
     nH
   }.ensuring(res => res >= 0 && (n.isLeaf || n.hasHeight(res)))
 
-  // def nodeHeight(n: SkipNode): BigInt = {
-  //   require(isSkipList(n))
-  //   val nH: BigInt = if (n.height == 0) {0}
-  //     else {
-  //       n.down match {
-  //         case d@SkipNode(_,_,_,_) => nodeHeight(d)+1
-  //         case Leaf => 0
-  //       }
-  //     }
-  //   nH
-  // }.ensuring(res => res >= 0 && res == n.height)
-
   def hasSameValue(a: Node, b: Node): Boolean = {
     (a,b) match {
       case (aS@SkipNode(vA,_,_,_),bS@SkipNode(vB,_,_,_)) => return vA == vB
@@ -544,10 +530,10 @@ case object Leaf extends Node
     }
   }
 
-  def getValueOrElse(n: Node): Int = {
-    n match {
-      case Leaf => -1
-      case SkipNode(value, down, right, height) => value
+  def hasValueAtLeast(a: Node, b: Node): Boolean = {
+    (a,b) match {
+      case (aS@SkipNode(vA,_,_,_),bS@SkipNode(vB,_,_,_)) => return vA >= vB
+      case _ => return false
     }
   }
 
@@ -934,7 +920,7 @@ case object Leaf extends Node
         }
       }
     }
-  } ensuring (_ => getValueOrElse(n)>= getValueOrElse(lower))
+  } ensuring (_ => hasValueAtLeast(n, lower))
   
   def lem_newDownIsInRightSubtreeOfOld(n: Node, k: Int): Unit = {
     require(n.isSkipList)
