@@ -1065,7 +1065,7 @@ def findNewDown(t: Node, v: Int): Node = t match {
   //} ensuring (_ => isInRightSubtree(x.down, n.down))
 
 
-  def hasSameValueandHeight(a : Node, b : Node): Boolean = {
+  def hasSameValueAndHeight(a : Node, b : Node): Boolean = {
       (a,b) match {
       case (SkipNode(vA,dA,rA,hA), SkipNode(vB,dB,rB,hB)) => vA == vA && hA == hA
       case (Leaf, Leaf) => true
@@ -1086,7 +1086,7 @@ def findNewDown(t: Node, v: Int): Node = t match {
       case (o@SkipNode(value, down, right, height), n@SkipNode(valueL, downL, rightL, heightL)) => {
         val newDown = findNewDown(n, value)
         assert(plugLowerLevel(o,n).isSkipNode)
-        assert(hasSameValueandHeight(plugLowerLevel(o,n),o))
+        assert(hasSameValueAndHeight(plugLowerLevel(o,n),o))
         right match {
           case right@SkipNode(valueR, _, _, _) => plugLowerLevelHasNonNegativeHeightAndIncreasesToTheRight(right,newDown)
           case Leaf => lem_newDownReturnsSkipList(newLowerLeftmost, value)
@@ -1108,7 +1108,7 @@ def findNewDown(t: Node, v: Int): Node = t match {
       case (o@SkipNode(value, down, right, height), n@SkipNode(valueL, downL, rightL, heightL)) => {
         val newDown = findNewDown(n, value)
         assert(plugLowerLevel(o,n).isSkipNode)
-        assert(hasSameValueandHeight(plugLowerLevel(o,n),o))
+        assert(hasSameValueAndHeight(plugLowerLevel(o,n),o))
         right match {
           case right@SkipNode(valueR, _, _, _) => {
             plugLowerLevelReturnsHeightDrecreasesDown(right,newDown)
@@ -1151,7 +1151,7 @@ def findNewDown(t: Node, v: Int): Node = t match {
       case (o@SkipNode(value, down, right, height), n@SkipNode(valueL, downL, rightL, heightL)) => {
         val newDown = findNewDown(n, value)
         assert(plugLowerLevel(o,n).isSkipNode)
-        assert(hasSameValueandHeight(plugLowerLevel(o,n),o))
+        assert(hasSameValueAndHeight(plugLowerLevel(o,n),o))
         right match {
           case right@SkipNode(valueR, downR, _, _) => {
             plugLowerLevelReturnsLevelsAxiom(right,newDown)
