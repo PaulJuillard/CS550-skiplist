@@ -1006,106 +1006,128 @@ def findNewDown(t: Node, v: Int): Node = t match {
   //  def higherLevelIsSubsetofLowerOne(n: SkipNode, x: SkipNode): Unit = {
   //} ensuring (_ => isInRightSubtree(x.down, n.down))
 
-  //def isLowerOfBis(n : Node, lower: Node): Node = {
-  //  n match {
-  //    case SkipNode(_, downA, _, _) => downA match {
-  //      case SkipNode(value, down, right, height) => 
-  //        return value == lower.value
-  //      case Leaf => return Leaf
-  //    }
-  //    case _ => return Leaf
-  //  }
-  //}
 
-
-  /*def plugLowerLevelDoesNotModifiesDownSubtree(oldCurrentLeftmost: SkipNode, newLowerLeftmost: SkipNode): Unit = {
-    require(isSkipList(oldCurrentLeftmost))
-    require(isSkipList(newLowerLeftmost))
-    require(isSkipNode(oldCurrentLeftmost))
-    require(isSkipNode(newLowerLeftmost))
+  def hasSameValueandHeight(a : Node, b : Node): Boolean = {
+      (a,b) match {
+      case (SkipNode(vA,dA,rA,hA), SkipNode(vB,dB,rB,hB)) => vA == vA && hA == hA
+      case (Leaf, Leaf) => true
+      case _ => false
+    }
+  }
+  
+  def plugLowerLevelHasNonNegativeHeightAndIncreasesToTheRight(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Unit = {
+    require(oldCurrentLeftmost.isSkipList)
+    require(newLowerLeftmost.isSkipList)
+    require(oldCurrentLeftmost.isSkipNode)
+    require(newLowerLeftmost.isSkipNode)
     require(nodeHeight(oldCurrentLeftmost) > 0)
     require(nodeHeight(oldCurrentLeftmost) == nodeHeight(newLowerLeftmost) + 1)
     require(lowerLevelIsSuperset(oldCurrentLeftmost, newLowerLeftmost))
-    //require(oldCurrentLeftmost.value == newLowerLeftmost.value)  // TODO : KEEP THAT ?
-    lem_higherRootHasLowerValue(oldCurrentLeftmost,newLowerLeftmost)
-    (oldCurrentLeftmost,newLowerLeftmost) match {
-      case (o@SkipNode(vO,dO,rO,hO), n@SkipNode(vN,dN,rN,hN)) => {
-        assert(vO>=vN)
-        plugLowerLevel(o,n) match {
-          case p@SkipNode(vP, dP, rP, hP) => {
-            if(vO == vN){
-              assert(isLowerOf(plugLowerLevel(o,n),n))
-              dP match {
-                case dPS@SkipNode(value, down, right, height) => 
-                  assert(lowerLevelIsSuperset(dPS,dPS))
-                  
+    decreases(sizeRight(oldCurrentLeftmost))
+    (oldCurrentLeftmost, newLowerLeftmost) match {
+      case (o@SkipNode(value, down, right, height), n@SkipNode(valueL, downL, rightL, heightL)) => {
+        val newDown = findNewDown(n, value)
+        assert(plugLowerLevel(o,n).isSkipNode)
+        assert(hasSameValueandHeight(plugLowerLevel(o,n),o))
+        right match {
+          case right@SkipNode(valueR, _, _, _) => plugLowerLevelHasNonNegativeHeightAndIncreasesToTheRight(right,newDown)
+          case Leaf => lem_newDownReturnsSkipList(newLowerLeftmost, value)
+        }
+      }
+    }
+  } ensuring (hasNonNegativeHeight(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)) && increasesToTheRight(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
+
+  def plugLowerLevelReturnsHeightDrecreasesDown(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Unit = {
+    require(oldCurrentLeftmost.isSkipList)
+    require(newLowerLeftmost.isSkipList)
+    require(oldCurrentLeftmost.isSkipNode)
+    require(newLowerLeftmost.isSkipNode)
+    require(nodeHeight(oldCurrentLeftmost) > 0)
+    require(nodeHeight(oldCurrentLeftmost) == nodeHeight(newLowerLeftmost) + 1)
+    require(lowerLevelIsSuperset(oldCurrentLeftmost, newLowerLeftmost))
+    decreases(sizeRight(oldCurrentLeftmost))
+    (oldCurrentLeftmost, newLowerLeftmost) match {
+      case (o@SkipNode(value, down, right, height), n@SkipNode(valueL, downL, rightL, heightL)) => {
+        val newDown = findNewDown(n, value)
+        assert(plugLowerLevel(o,n).isSkipNode)
+        assert(hasSameValueandHeight(plugLowerLevel(o,n),o))
+        right match {
+          case right@SkipNode(valueR, _, _, _) => {
+            plugLowerLevelReturnsHeightDrecreasesDown(right,newDown)
+            plugLowerLevelHasNonNegativeHeightAndIncreasesToTheRight(o,n)
+          }
+          case Leaf => {
+            if (value != valueL){
+              lem_newDownReturnsSkipList(n, value)
+              lem_isInRightSubtreeImpliesSelfValueIsLower(n, value)
+              lem_newDownReturnsSkipNodeOfValue(n,value)
+              plugLowerLevelHasNonNegativeHeightAndIncreasesToTheRight(o,n)
+              assert(heightDecreasesDown(newDown))
+              newDown match {
+                case nD@SkipNode(ndV, ndD, ndR, ndH) => {
+                  assert(ndV == value)
+                  lem_newDownIsInRightSubtreeOfOld(n,value)
+                  lem_inRightSubtreeHasSameNodeHeight(n, nD)
+                  assert(height == heightL+1)
+                  assert(ndH == heightL)
+                }
               }
-              //assume(lowerLevelIsSuperset(plugLowerLevel(oldCurrentLeftmost,newLowerLeftmost),newLowerLeftmost))
-            } else {
-              assume(lowerLevelIsSuperset(plugLowerLevel(oldCurrentLeftmost,newLowerLeftmost),newLowerLeftmost))
             }
           }
         }
       }
     }
-  //} ensuring (isLowerOf(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost) ,newLowerLeftmost))
-  } ensuring (lowerLevelIsSuperset(plugLowerLevel(oldCurrentLeftmost,newLowerLeftmost),newLowerLeftmost))
+  } ensuring (heightDecreasesDown(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
+
+
+  def plugLowerLevelReturnsLevelsAxiom(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Unit = {
+    require(oldCurrentLeftmost.isSkipList)
+    require(newLowerLeftmost.isSkipList)
+    require(oldCurrentLeftmost.isSkipNode)
+    require(newLowerLeftmost.isSkipNode)
+    require(nodeHeight(oldCurrentLeftmost) > 0)
+    require(nodeHeight(oldCurrentLeftmost) == nodeHeight(newLowerLeftmost) + 1)
+    require(lowerLevelIsSuperset(oldCurrentLeftmost, newLowerLeftmost))
+    decreases(sizeRight(oldCurrentLeftmost))
+    (oldCurrentLeftmost, newLowerLeftmost) match {
+      case (o@SkipNode(value, down, right, height), n@SkipNode(valueL, downL, rightL, heightL)) => {
+        val newDown = findNewDown(n, value)
+        assert(plugLowerLevel(o,n).isSkipNode)
+        assert(hasSameValueandHeight(plugLowerLevel(o,n),o))
+        right match {
+          case right@SkipNode(valueR, downR, _, _) => {
+            plugLowerLevelReturnsLevelsAxiom(right,newDown)
+            lem_newDownIsInRightSubtreeOfOld(newDown,valueR)
+            assert(isInRightSubtree(findNewDown(newDown, valueR), newDown))
+          }
+          case Leaf => lem_newDownReturnsSkipList(newLowerLeftmost, value)
+        }
+      }
+    }
+  } ensuring (levelsAxiom(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
 
   def plugLowerLevelReturnsSkipList(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Unit = {
-    require(isSkipList(oldCurrentLeftmost))
-    require(isSkipList(newLowerLeftmost))
-    require(isSkipNode(oldCurrentLeftmost))
-    require(isSkipNode(newLowerLeftmost))
+    require(oldCurrentLeftmost.isSkipList)
+    require(newLowerLeftmost.isSkipList)
+    require(oldCurrentLeftmost.isSkipNode)
+    require(newLowerLeftmost.isSkipNode)
     require(nodeHeight(oldCurrentLeftmost) > 0)
-    //require(hasSameValue(oldCurrentLeftmost,newLowerLeftmost)) // TODO : KEEP THAT ?
     require(nodeHeight(oldCurrentLeftmost) == nodeHeight(newLowerLeftmost) + 1)
     require(lowerLevelIsSuperset(oldCurrentLeftmost, newLowerLeftmost))
     (oldCurrentLeftmost,newLowerLeftmost) match {
       case (o@SkipNode(vO,dO,rO,hO), n@SkipNode(vN,dN,rN,hN)) => {
-        lem_higherRootHasLowerValue(o,n)
-        assert(vO>=vN)
-        if (vO == vN){
-          plugLowerLevel(o,n) match {
-            case p@SkipNode(vP, dP, rP, hP) => {
-              assert(hasNonNegativeHeight (p))
-              assert(heightDecreasesDown  (p))
-              assert(increasesToTheRight  (p))
-              assert(levelsAxiom          (p))
-              assume(isSkipList(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
-            }
+        plugLowerLevel(o,n) match {
+          case p@SkipNode(vP, dP, rP, hP) => {
+            plugLowerLevelHasNonNegativeHeightAndIncreasesToTheRight(o,n)
+            plugLowerLevelReturnsLevelsAxiom(o,n)
+            plugLowerLevelReturnsHeightDrecreasesDown(o,n)
+            assert(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost).isSkipList)
           }
         }
-        if (vO > vN){
-          rN match {
-            case rNS@SkipNode(value, down, right, height) => {
-              //assert(plugLowerLevel(o,n) == plugLowerLevel(o,rNS))
-              assume(isSkipList(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
-            }
-            case Leaf => ()
-          }
-        
-        } /*else {
-          assert(vO == vN)
-          plugLowerLevel(o,n) match {
-            case p@SkipNode(vP, dP, rP, hP) => {
-              plugLowerLevelDoesNotModifiesDownSubtree(o,n)
-              assert(isLowerOf(p ,n))
-              assert(isSkipList(dP))
-              //assert(hasNonNegativeHeight (p))
-              //assert(heightDecreasesDown  (p))
-              //assert(increasesToTheRight  (p))
-              //assert(levelsAxiom          (p))
-
-            }
-            case Leaf => ()
-          }
-        }*/
       }
     }
-    
-     // TODO : Remove assume
-  } ensuring (isSkipList(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
-*/
+  } ensuring (plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost).isSkipList)
+
   
 
 //_____________________________________________ SIZE proof and lemmas

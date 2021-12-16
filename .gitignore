@@ -14,3 +14,4 @@ project/
 .bloop/*
 stainless-stack-trace.txt
 vccache.bin
+.DS_Store
