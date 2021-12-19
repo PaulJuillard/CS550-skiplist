@@ -117,7 +117,7 @@ case object Leaf extends Node
     require(currentLevel <= nodeHeight(topLeftmost))
     require(desiredHeight <= nodeHeight(topLeftmost))
     require(currentLevel >= 0)
-    require(currentLevel >= (desiredHeight + 1) || isInRightSubtree(k, lowerLeftmost))
+    require((currentLevel == 0) || (currentLevel >= (desiredHeight + 1)) || isInRightSubtree(k, lowerLeftmost))
     require(k > Int.MinValue)
     require(nodeHeight(currentLeftmost) == currentLevel)
     require(isLowerOf(currentLeftmost, topLeftmost))
@@ -1107,15 +1107,75 @@ case object Leaf extends Node
     }
   }
 
-  // def insert(sl: SkipList, k: Int, height: BigInt): SkipList = {
-  //   require(sl.isSkipList)
-  //   require(height >= 0)
-  //   // if needed, bring first value to same height
-  //   val newHead = if (height > nodeHeight(sl.head)) {increaseHeight(sl.head, height)} else {sl.head}
-  //   assert(newHead.isSkipList)
-  //   val currentLeftmost = // TODO
-  //   SkipList(insertUpwards(k, height, newHead, currentLeftmost, 0, Leaf), max(sl.maxHeight, height))
-  // }
+  def lem_increaseHeightReturnsSkiplist(n: Node, newHeight: BigInt): Unit = {
+    require(n.isSkipList)
+    require(newHeight >= nodeHeight(n))
+    decreases(newHeight - nodeHeight(n))
+
+    n match {
+      case n@SkipNode(value, down, right, height) => {
+        if (height >= newHeight) {
+          ()
+        } 
+        else {
+          val up = SkipNode(value, n, Leaf, height+1)
+          lem_increaseHeightReturnsSkiplist(up, newHeight)
+          ()
+        }
+      }
+      case Leaf => ()
+    }
+  } ensuring ( _ => increaseHeight(n, newHeight).isSkipList)
+
+  def lem_increaseHeightReturnsMinValueNode(n: Node, newHeight: BigInt): Unit = {
+    require(n.isSkipList)
+    require(newHeight >= nodeHeight(n))
+    require(n.hasValue(Int.MinValue))
+
+    decreases(newHeight - nodeHeight(n))
+
+    n match {
+      case n@SkipNode(value, down, right, height) => {
+        if (height >= newHeight) {
+          ()
+        } 
+        else {
+          val up = SkipNode(value, n, Leaf, height+1)
+          lem_increaseHeightReturnsMinValueNode(up, newHeight)
+          ()
+        }
+      }
+      case Leaf => ()
+    }
+  } ensuring ( _ => increaseHeight(n, newHeight).hasValue(Int.MinValue))
+
+  def insert(sl: SkipList, k: Int, height: BigInt): SkipList = {
+    require(sl.isSkipList)
+    require(height >= 0)
+    
+    // if needed, bring first value to same height
+
+
+    val newHead = if (height > nodeHeight(sl.head)) {
+                    assert(height > nodeHeight(sl.head))
+                    lem_increaseHeightReturnsSkiplist(sl.head, height)
+                    lem_increaseHeightReturnsMinValueNode(sl.head, height)
+                    increaseHeight(sl.head, height)
+                  } else {
+                    sl.head
+                  }
+
+    assert(newHead.isSkipList)
+    assert(newHead.hasValue(Int.MinValue))
+
+    if(k == Int.MinValue) return sl
+
+    val currentLeftmost = levelLeftmost(newHead, 0)
+    assert(currentLeftmost.isSkipList)
+    assert(currentLeftmost.hasValue(Int.MinValue))
+    assume(isInRightSubtree(k, Leaf))  //TODO wtf as long as 0==0 this should not be necessary
+    SkipList(insertUpwards(k, height, newHead, currentLeftmost, 0, Leaf), max(sl.maxHeight, height))
+  }
 
   // def insert(sl: SkipList, k:BigInt): SkipList = {
   //    if (isIn(sl, k)) {
@@ -1484,20 +1544,20 @@ def findNewDown(t: Node, v: Int): Node = t match {
     }
   } ensuring (_ => n.down.isLeaf || isInRightSubtree(v, n.down))
 
-/*  
-   1 - If sl is a skiplist, insert(sl, a) is also a skiplist ==============
-  def insertReturnsSkiplist(sl : SkipList, v:BigInt, height:BigInt): Unit = {
-    require(isSkipList(sl))
+  // 1 - If sl is a skiplist, insert(sl, a) is also a skiplist ==============
+  def insertReturnsSkiplist(sl : SkipList, v: Int, height:BigInt): Unit = {
+    require(sl.isSkipList)
     require(height>=0)
     
-  } ensuring (_ => isSkipList(insert(sl,v,height)))
-
-  def insertReturnsSkiplist(n : Node, v:BigInt, height:BigInt): Unit = {
-    require(isSkipList(n))
-    require(height>=0)
-    
-  } ensuring (_ => isSkipList(insert(n,v,height)))
+  } ensuring (_ => insert(sl,v,height).isSkipList)
   
+  // def insertReturnsSkiplist(n : Node, v: Int, height:BigInt): Unit = {
+  //   require(n.isSkipList)
+  //   require(height>=0)
+  //   
+  // } ensuring (_ => insert(n,v,height).isSkipList)
+    
+    /*
   // 2 - If sl is a skiplist, remove(sl, a) is also a skiplist ==============
   def insertReturnsSkiplist(sl : SkipList, v:BigInt): Unit = {
     require(isSkipList(sl))
@@ -1508,13 +1568,13 @@ def findNewDown(t: Node, v: Int): Node = t match {
     require(isSkipList(n))
     
   } ensuring (_ => isSkipList(remove(n,v)))
-
+  */
   // 3 - If sl is a skiplist, insert(sl, a) contains a ======================
-  def insertReallyInserts(sl: SkipList, v:BigInt, height:BigInt): Unit = {
-    require(isSkipList(sl))
+  def insertReallyInserts(sl: SkipList, v:Int, height:BigInt): Unit = {
+    require(sl.isSkipList)
     require(height>=0)
   } ensuring (_ => isInTheList(v,insert(sl,v,height)))
-
+  /*
   def insertReallyInserts(n: Node, v:BigInt, height:BigInt): Unit = {
     require(isSkipList(n))
     require(height>=0)
@@ -1528,20 +1588,14 @@ def findNewDown(t: Node, v: Int): Node = t match {
   def removeReallyRemoves(n: Node, v:BigInt): Unit = {
     require(isSkipList(n))
   } ensuring (_ => !isInTheList(v,remove(n,v)))
-
+  */
   // 5 - If sl is a skiplist and b is in sl, insert(sl, a) contains b =======
-  def insertDoesNotRemoveElements(sl: SkipList, a:BigInt, height:BigInt, b:BigInt): Unit = {
-    require(isSkipList(sl))
+  def insertDoesNotRemoveElements(sl: SkipList, a: Int, height:BigInt, b:Int): Unit = {
+    require(sl.isSkipList)
     require(height>=0)
     require(isInTheList(b,sl))
   } ensuring (_ => isInTheList(b,insert(sl,a,height)))
-
-  def insertDoesNotRemoveElements(n: Node, a:BigInt, height:BigInt, b:BigInt): Unit = {
-    require(isSkipList(n))
-    require(height>=0)
-    require(isInTheList(b,n))
-  } ensuring (_ => isInTheList(b,insert(n,a,height)))
-
+  /*
   // 6 - If sl is a skiplist and b is in sl, remove(sl, a != b) contains b ===
   def removeDoesNotRemoveOtherElements(sl: SkipList, a:BigInt, b:BigInt): Unit = {
     require(isSkipList(sl))
@@ -1552,13 +1606,20 @@ def findNewDown(t: Node, v: Int): Node = t match {
     require(isSkipList(n))
     require(isInTheList(b,n))
   } ensuring (_ => isInTheList(b,remove(n,a)))
-
+  */
   // 7 - If sl is a skiplist and a is in sl, search(sl, a) returns Some(a) ===
-    def searchFindsElement(sl: SkipList, v:BigInt): Unit = {
-      require(isSkipList(sl))
-      require(isInTheList(v,sl))
-    } ensuring (_ => search(sl,v) == Some(v))
+  def searchFindsElement(sl: SkipList, v: Int): Unit = {
+    require(sl.isSkipList)
+    require(isInTheList(v,sl))
+  } ensuring (_ => search(sl,v) == Some(v))
 
+  // 8 - If sl is a skiplist and a is not in sl, search(sl, a) returns None ==
+  def searchFindsNone(sl: SkipList, v: Int): Unit = {
+    require(sl.isSkipList)
+    require(!isInTheList(v,sl))
+  } ensuring (_ => search(sl,v) == None())
+
+  /*
   def searchFindsElement(n: Node, v:Int): Unit = {
     require(isSkipList(n))
     require(isInTheList(v,n))  
@@ -1581,12 +1642,6 @@ def findNewDown(t: Node, v: Int): Node = t match {
       }
     }
   } ensuring (_ => search_(n,v) == Some(v))
-  
-  // 8 - If sl is a skiplist and a is not in sl, search(sl, a) returns None ==
-  def searchFindsNone(sl: SkipList, v:BigInt): Unit = {
-    require(isSkipList(sl))
-    require(!isInTheList(v,sl))
-  } ensuring (_ => search(sl,v) == None())
 
   def searchFindsNone(n: Node, v:BigInt): Unit = {
     require(isSkipList(n))
@@ -2210,6 +2265,7 @@ def lem_newDownReturnsSkipNodeOfValue(n: Node, v: Int): Unit = {
     }
     res
   } ensuring (res => res.isSkipList && res.hasValue(Int.MinValue) && res.hasHeight(level) && isLowerOf(res, t)) 
+
 //_____________________________________________ HEIGHT proofs and lemmas
   // All nodes in skipList have their height upper bounded
   def hasMaxHeight(sl: SkipList): Boolean = { 
