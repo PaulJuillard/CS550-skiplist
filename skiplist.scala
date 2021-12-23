@@ -254,12 +254,86 @@ case object Leaf extends Node
     }
   }
 
+  def isRightOf(right: Node, n: Node): Boolean = {
+    require(n.isSkipNode)
+    n match {
+      case SkipNode(_, _, r, _) => r == right
+    }
+  }
+
   def lem_isDownOfImpliesSubset(down: Node, n: Node): Boolean = {
     require(n.isSkipNode)
     require(down.isSkipNode)
+    require(n.isSkipList)
     require(isDownOf(down, n))
-    assume(isSubsetOf(n, down)) // TODO : Proof
+    (n, down) match {
+      case (SkipNode(value, _, right, _), SkipNode(valueL, _, _, _)) => {
+        check(value == valueL)
+        right match {
+          case right@SkipNode(valueR, downR, _, _) => {
+            lem_isDownOfImpliesSubset(downR, right)
+            lem_isInRightSubtreeImpliesSubset(downR, down)
+            lem_isSubsetOfTransitivity(right, downR, down)
+          }
+          case Leaf => ()
+        }
+      }
+    }
     isSubsetOf(n, down)
+  }.holds
+
+  def lem_isInRightSubtreeImpliesSubset(right: Node, n: Node): Boolean = {
+    require(n.isSkipNode)
+    require(right.isSkipNode)
+    require(n.isSkipList)
+    require(isInRightSubtree(right, n))
+    (n, right) match {
+      case (SkipNode(value, _, r, _), right@SkipNode(_, _, _, _)) => {
+        if (right != r) {
+          lem_isInRightSubtreeImpliesSubset(right, r)
+          lem_toTheRightIsSubset(r, n)
+          lem_isSubsetOfTransitivity(right, r, n)
+        }
+        else {
+          lem_toTheRightIsSubset(r, n)
+        }
+      }
+    }
+    isSubsetOf(right, n)
+  }.holds
+
+  def lem_toTheRightIsSubset(right: Node, n: Node): Boolean = {
+    require(n.isSkipNode)
+    require(right.isSkipNode)
+    require(n.isSkipList)
+    require(isRightOf(right, n))
+    (n, right) match {
+      case (SkipNode(_, _, _, _), right@SkipNode(valueR, _, rightR, _)) => {
+        // check(isInRightSubtree(valueR, n))
+        lem_toTheRightIsStrictSubset(right, n)
+      }
+    }
+    isSubsetOf(right, n)
+  }.holds
+
+  def lem_toTheRightIsStrictSubset(right: Node, n: Node): Boolean = {
+    require(n.isSkipNode)
+    require(right.isSkipNode)
+    require(n.isSkipList)
+    require(isInRightSubtree(right, n))
+    (n, right) match {
+      case (n@SkipNode(_, _, _, _), right@SkipNode(valueR, _, rightR, _)) => {
+        lem_isInRightSubtreeImpliesValueIsAlsoIn(n, right, valueR)
+        rightR match {
+          case SkipNode(_, _, _, _) => {
+            lem_rightIsAlsoInRightSubtree(n, right)
+            lem_toTheRightIsStrictSubset(rightR, n)
+          }
+          case Leaf => ()
+        }
+      }
+    }
+    lowerLevelIsStrictSuperset(right, n)
   }.holds
 
   def lem_plugLowerLevelReturnsSuperset(currentLeftmost: Node, lowerLeftmost: Node): Boolean = {
@@ -820,7 +894,7 @@ def findNewDown(t: Node, v: Int): Node = t match {
         else {
           if (n.down.isSkipNode) {
             (r.down, n.down) match {
-              case (rD@SkipNode(_, _, _, _), nD@SkipNode(_, _, _, _)) => lem_isInRightSubtreeImpliesValueIsAlsoIn(nD, rD)
+              case (rD@SkipNode(valueRD, _, _, _), nD@SkipNode(_, _, _, _)) => lem_isInRightSubtreeImpliesValueIsAlsoIn(nD, rD, valueRD)
             }
           }
         }
@@ -1362,14 +1436,20 @@ def findNewDown(t: Node, v: Int): Node = t match {
   } ensuring (isInRightSubtree(n3, n1))
 
   // Proof that isInRightSubtree(node, node) implies isInRightSubtree(v, node)
-  def lem_isInRightSubtreeImpliesValueIsAlsoIn(n: SkipNode, target: SkipNode): Unit = {
+  def lem_isInRightSubtreeImpliesValueIsAlsoIn(n: Node, target: Node, v: Int): Unit = {
+    require(n.isSkipNode)
+    require(target.hasValue(v))
     require(isInRightSubtree(target, n))
-    if (target != n.right) {
-      n.right match {
-        case r@SkipNode(_, _, _, _) => lem_isInRightSubtreeImpliesValueIsAlsoIn(r, target)
+    n match {
+      case n@SkipNode(_, _, right, _) => {
+        if (target != right) {
+          right match {
+            case r@SkipNode(_, _, _, _) => lem_isInRightSubtreeImpliesValueIsAlsoIn(r, target, v)
+          }
+        }
       }
     }
-  } ensuring (_ => isInRightSubtree(target.value, n))
+  } ensuring (_ => isInRightSubtree(v, n))
 
   def lem_isInRightSubtreeImpliesSelfValueIsLower(n: SkipNode, k: Int): Unit = {
     require(n.isSkipList)
@@ -1441,7 +1521,7 @@ def findNewDown(t: Node, v: Int): Node = t match {
     n match {
       case n@SkipNode(_, _, right, _) => (right, a) match {
         case (right@SkipNode(value, _, _, _), a@SkipNode(valueA, _, _, _)) => {
-          lem_isInRightSubtreeImpliesValueIsAlsoIn(right, a)
+          lem_isInRightSubtreeImpliesValueIsAlsoIn(right, a, valueA)
           lem_isInRightSubtreeImpliesSelfValueIsLower(right, valueA)
         }
       }
