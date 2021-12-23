@@ -230,10 +230,95 @@ case object Leaf extends Node
 
   def lem_insertRightReturnsSuperset(n: Node, k: Int): Boolean = {
     require(n.isSkipList)
-    require(n.valueAtMost(k))
+    require(n.valueSmallerThan(k))
     require(levelBelowContainsK(n, k))
-    assume(isSubsetOf(n, insertRight(n, k))) // TODO : Proof
+    decreases(size(n))
+    val insertedRight = insertRight(n, k)
+    n match {
+      case n@SkipNode(v, d, r, h) => {
+        r match {
+          case r@SkipNode(valueR, downR, rightR, heightR) => {
+            if (valueR <= k) {
+              if (valueR == k) {
+                lem_isSubsetOfItself(n, r)
+              }
+              else {
+                sizeDecreasesToTheRight(n)
+                lem_insertRightReturnsSuperset(r, k)
+                lem_rightIsSubsetOfOtherRightImpliesSubset(n, insertedRight)
+                check(isSubsetOf(n, insertedRight))
+              }
+            }
+            else {
+              val nD = findNewDown(d, k)
+              val nR = SkipNode(k, nD, r, h)
+              assert(isSubsetOf(r, nR)) // TODO : Proof (true because r is nr's right, so nr is strict superset of r)
+              lem_rightIsSubsetOfOtherRightImpliesSubset(n, insertedRight)
+              check(isSubsetOf(n, insertedRight))
+            }
+          }
+          case Leaf => ()
+        }
+      }
+    }
     isSubsetOf(n, insertRight(n, k))
+  }.holds
+
+  def lem_rightIsSubsetOfOtherRightImpliesSubset(n: Node, lower: Node): Boolean = {
+    require(n.isSkipNode)
+    require(lower.isSkipNode)
+    require(rightIsSkipNode(n))
+    require(rightIsSkipNode(lower))
+    require(hasSameValue(n, lower))
+    require(rightIsSubsetOfOtherRightAndSameDown(n, lower))
+    (n, lower) match {
+      case (n@SkipNode(_, down, right, _), lower@SkipNode(_, downL, rightL, _)) => {
+        (right, rightL) match {
+          case (right@SkipNode(_, _, _, _), rightL@SkipNode(_, _, _, _)) => {
+            assert(isSubsetOf(right, rightL))
+          }
+        }
+      }
+    }
+    isSubsetOf(n, lower) // TODO : Proof
+  }.holds
+
+  def rightIsSubsetOfOtherRightAndSameDown(n: Node, lower: Node): Boolean = {
+    require(n.isSkipNode)
+    require(lower.isSkipNode)
+    require(rightIsSkipNode(n))
+    require(rightIsSkipNode(lower))
+    (n, lower) match {
+      case (n@SkipNode(_, down, right, _), lower@SkipNode(_, downL, rightL, _)) => {
+        (right, rightL) match {
+          case (right@SkipNode(_, _, _, _), rightL@SkipNode(_, _, _, _)) => {
+            isSubsetOf(right, rightL) && down == downL
+          }
+        }
+      }
+    }
+  }
+
+  def rightIsSkipNode(n: Node): Boolean = {
+    require(n.isSkipNode)
+    n match {
+      case SkipNode(_, _, right, _) => {
+        right.isSkipNode
+      }
+    }
+  }
+
+  def lem_isSubsetOfItself(n: Node, right: Node): Boolean = {
+    require(n.isSkipNode)
+    require(right.isSkipNode)
+    require(n.isSkipList)
+    require(isRightOf(right, n))
+    n match {
+      case SkipNode(_, _, right, _) => {
+        lem_toTheRightIsStrictSubset(right, n)
+      }
+    }
+    isSubsetOf(n, n)
   }.holds
 
   def lem_insertRightZeroHeightReturnsSuperset(n: Node, k: Int): Boolean = {
@@ -634,20 +719,14 @@ case object Leaf extends Node
                     lem_isInRightSubtreeTransitive(insertedRight, nR, k)
                   }
                 }
-                // assert(isInRightSubtree(k, insertedRight))
               }
             }
-            // else {
-            //   assert(isInRightSubtree(k, insertedRight))
-            // }
           }
-          case Leaf => () // {
-          //   assert(isInRightSubtree(k, insertedRight))
-          // }
+          case Leaf => ()
         }
       }
     }
-    isInRightSubtree(k, insertedRight) // TODO : Proof
+    isInRightSubtree(k, insertedRight)
   }.holds
 
   def lem_plugLowerLevelContainsKBelow(oldCurrentLeftmost: Node, newLowerLeftmost: Node, k: Int): Boolean = {
