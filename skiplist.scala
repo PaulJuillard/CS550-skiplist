@@ -65,6 +65,7 @@ sealed abstract class Node {
   def valueAtMost(k: Int): Boolean = this match {case SkipNode(v, _, _, _) => v <= k; case _ => false}
   def valueHigherThan(k: Int): Boolean = this match {case SkipNode(v, _, _, _) => v > k; case _ => false}
   def heightAtMost(h: BigInt): Boolean = this match {case SkipNode(_, _, _, v) => v <= h; case _ => false}
+  def heightAtLeast(h: BigInt): Boolean = this match {case SkipNode(_, _, _, v) => v >= h; case _ => false}
   def hasHeight(h: BigInt): Boolean = this match {case SkipNode(_, _, _, v) => v == h; case _ => false}
 }
 case class SkipList(head: Node, maxHeight: BigInt) {
@@ -266,11 +267,13 @@ case object Leaf extends Node
     require(down.isSkipNode)
     require(n.isSkipList)
     require(isDownOf(down, n))
+    decreases(size(n))
     (n, down) match {
-      case (SkipNode(value, _, right, _), SkipNode(valueL, _, _, _)) => {
+      case (n@SkipNode(value, _, right, _), SkipNode(valueL, _, _, _)) => {
         check(value == valueL)
         right match {
           case right@SkipNode(valueR, downR, _, _) => {
+            sizeDecreasesToTheRight(n)
             lem_isDownOfImpliesSubset(downR, right)
             lem_isInRightSubtreeImpliesSubset(downR, down)
             lem_isSubsetOfTransitivity(right, downR, down)
@@ -309,7 +312,6 @@ case object Leaf extends Node
     require(isRightOf(right, n))
     (n, right) match {
       case (SkipNode(_, _, _, _), right@SkipNode(valueR, _, rightR, _)) => {
-        // check(isInRightSubtree(valueR, n))
         lem_toTheRightIsStrictSubset(right, n)
       }
     }
@@ -355,8 +357,85 @@ case object Leaf extends Node
     require(down2.hasHeight(height))
     require(isLowerOf(down1, n))
     require(isLowerOf(down2, n))
-    assume(isDownOf(down2, down1)) // TODO : Proof
+    n match {
+      case n@SkipNode(_, down, _, _) => {
+        lem_isLowerOfImplyHeightAtLeast(n, down1, height+1)
+        check(n != down2)
+        if (n == down1) {
+          lem_isLowerOfAndSameHeightImplySame(down, down2, height)
+        }
+        else {
+          lem_isDownOf(down, down1, down2, height)
+        }
+      }
+    }
     isDownOf(down2, down1)
+  }.holds
+
+  def lem_isLowerOfImplyHeightAtLeast(n: Node, lower: Node, height: BigInt): Boolean = {
+    require(n.isSkipNode)
+    require(n.isSkipList)
+    require(lower.hasHeight(height))
+    require(isLowerOf(lower, n))
+    n match {
+      case SkipNode(_, down, _, _) => {
+        if (n != lower) {
+          lem_isLowerOfImplyHeightAtLeast(down, lower, height)
+        }
+      }
+    }
+    n.heightAtLeast(height)
+  }.holds
+
+  def lem_isLowerOfAndSameHeightImplySame(n: Node, lower: Node, height: BigInt): Boolean = {
+    require(n.isSkipList)
+    require(lower.hasHeight(height))
+    require(n.hasHeight(height))
+    require(isLowerOf(lower, n))
+    n match {
+      case SkipNode(_, down, _, _) => {
+        down match {
+          case down@SkipNode(_, _, _, _) => {
+            lem_isLowerOfImpliesSkiplist(n, lower)
+            lem_greaterHeightImpliesNotLower(down, lower, height-1)
+          }
+          case Leaf => ()
+        }
+      }
+    }
+    lower == n
+  }.holds
+
+  def lem_isLowerOfImpliesSkiplist(n: Node, lower: Node): Boolean = {
+    require(n.isSkipList)
+    require(isLowerOf(lower, n))
+    n match {
+      case SkipNode(_, down, _, _) => {
+        if (n != lower) {
+          lem_isLowerOfImpliesSkiplist(down, lower)
+        }
+      }
+      case Leaf => ()
+    }
+    lower.isSkipList
+  }.holds
+
+  def lem_greaterHeightImpliesNotLower(n: Node, lower: Node, height: BigInt): Boolean = {
+    require(n.isSkipList)
+    require(lower.isSkipList)
+    require(lower.heightAtLeast(height+1))
+    require(n.hasHeight(height))
+    n match {
+      case SkipNode(_, down, _, _) => {
+        down match {
+          case SkipNode(_, _, _, _) => {
+            lem_greaterHeightImpliesNotLower(down, lower, height-1)
+          }
+          case Leaf => ()
+        }
+      }
+    }
+    !isLowerOf(lower, n)
   }.holds
 
   def lem_isSubsetOfTransitivity(a: Node, b: Node, c: Node): Boolean = {
@@ -373,22 +452,202 @@ case object Leaf extends Node
     require(n.isSkipList)
     require(n.valueAtMost(k))
     require(levelBelowContainsK(n, k))
+    decreases(size(n))
+    val insertedRight = insertRight(n, k)
     n match {
-      case n@SkipNode(_, _, _, _) => 
+      case n@SkipNode(v, d, r, h) => {
+        if (v != k) {
+          r match {
+            case r@SkipNode(valueR, downR, rightR, heightR) => {
+              if (valueR < k) {
+                lem_skipnodeToTheRightAlsoHasKeyToTheRight(d, r.down, k)
+                sizeDecreasesToTheRight(n)
+                lem_insertRightReturnsSkipList(r, k)
+              }
+              else {
+                lem_newDownReturnsSkipList(d, k)
+                lem_insertRightPreservesLevelsAxiom(n, k)
+                lem_insertRightPreservesHeightAxiom(n, k)
+                assert(increasesToTheRight(insertedRight))
+                check(insertedRight.isSkipList)
+              }
+            }
+            case Leaf => {
+              lem_newDownReturnsSkipList(d, k)
+              lem_insertRightPreservesHeightAxiom(n, k)
+              lem_insertRightPreservesLevelsAxiom(n, k)
+              check(insertedRight.isSkipList)
+            }
+          }
+        }
+      }
     }
-    assume(insertRight(n, k).isSkipList) // TODO : Proof
     insertRight(n, k).isSkipList
+  }.holds
+
+  def lem_insertRightPreservesLevelsAxiom(n: Node, k: Int): Boolean = {
+    require(n.isSkipList)
+    require(n.valueAtMost(k))
+    require(levelBelowContainsK(n, k))
+    decreases(size(n))
+    val insertedRight = insertRight(n, k)
+    n match {
+      case n@SkipNode(v, d, r, h) => {
+        if (v != k) {
+          r match {
+            case r@SkipNode(valueR, downR, rightR, heightR) => {
+              if (valueR < k) {
+                lem_skipnodeToTheRightAlsoHasKeyToTheRight(d, r.down, k)
+                sizeDecreasesToTheRight(n)
+                lem_insertRightPreservesLevelsAxiom(r, k)
+              }
+              else if (valueR > k) {
+                lem_newDownReturnsSkipList(d, k)
+                val nD = findNewDown(d, k)
+                val nR = SkipNode(k, nD, r, h)
+                if (!d.isLeaf) {
+                  lem_newDownReturnsSkipNodeOfValue(d, k)
+                  lem_newDownIsInRightSubtreeOfOld(d, k)
+                  check(isInRightSubtree(downR, d))
+                  lem_bothInRightSubtreeWithLowerValue(d, nD, downR, k, valueR)
+                  assert(isInRightSubtree(downR, nD))
+                }
+                check(levelsAxiom(insertedRight))
+              }
+            }
+            case Leaf => {
+              lem_newDownReturnsSkipList(d, k)
+              if (!d.isLeaf) {
+                lem_newDownIsInRightSubtreeOfOld(d, k)
+              }
+              check(levelsAxiom(insertedRight))
+            }
+          }
+        }
+      }
+    }
+    levelsAxiom(insertedRight)
+  }.holds
+
+  def lem_insertRightPreservesHeightAxiom(n: Node, k: Int): Boolean = {
+    require(n.isSkipList)
+    require(n.valueAtMost(k))
+    require(levelBelowContainsK(n, k))
+    decreases(size(n))
+    val insertedRight = insertRight(n, k)
+    lem_insertRightPreservesPositiveHeightAxiom(n, k)
+    assert(insertedRight.heightAtLeast(BigInt(1)))
+    n match {
+      case n@SkipNode(v, d, r, h) => {
+        if (v != k) {
+          r match {
+            case r@SkipNode(valueR, downR, rightR, heightR) => {
+              if (valueR < k) {
+                lem_skipnodeToTheRightAlsoHasKeyToTheRight(d, r.down, k)
+                sizeDecreasesToTheRight(n)
+                lem_insertRightPreservesHeightAxiom(r, k)
+              }
+              else {
+                lem_newDownReturnsSkipList(d, k)
+                val nD = findNewDown(d, k)
+                val nR = SkipNode(k, nD, r, h)
+                lem_newDownReturnsSkipNodeOfValue(d, k)
+              }
+            }
+            case Leaf => {
+              lem_newDownReturnsSkipList(d, k)
+              val nD = findNewDown(d, k)
+              val nR = SkipNode(k, nD, r, h)
+              lem_newDownReturnsSkipNodeOfValue(d, k)
+            }
+          }
+        }
+      }
+    }
+    heightDecreasesDown(insertedRight)
+  }.holds
+
+  def lem_insertRightPreservesPositiveHeightAxiom(n: Node, k: Int): Boolean = {
+    require(n.isSkipList)
+    require(n.valueAtMost(k))
+    require(levelBelowContainsK(n, k))
+    decreases(size(n))
+    val insertedRight = insertRight(n, k)
+    n match {
+      case n@SkipNode(v, d, r, h) => {
+        if (v != k) {
+          r match {
+            case r@SkipNode(valueR, downR, rightR, heightR) => {
+              if (valueR < k) {
+                lem_skipnodeToTheRightAlsoHasKeyToTheRight(d, r.down, k)
+                sizeDecreasesToTheRight(n)
+                lem_insertRightPreservesPositiveHeightAxiom(r, k)
+              }
+              else {
+                lem_newDownReturnsSkipList(d, k)
+              }
+            }
+            case Leaf => {
+              lem_newDownReturnsSkipList(d, k)
+            }
+          }
+        }
+      }
+    }
+    hasNonNegativeHeight(insertedRight)
+  }.holds
+
+  def lem_findNewDownHasGivenHeightAndValue(t: Node, v: Int): Boolean = {
+    require(t.isSkipList)
+    require(findNewDown(t, v).isSkipNode)
+    t match {
+      case SkipNode(value, down, right, height) => {
+        if (value != v) {
+          lem_findNewDownHasGivenHeightAndValue(right, v)
+        }
+      }
+    }
+    findNewDown(t, v).hasValue(v) && hasSameHeight(findNewDown(t, v), t)
   }.holds
 
   def lem_insertRightContainsKey(n: Node, k: Int): Boolean = {
     require(n.isSkipList)
-    require(n.valueAtMost(k))
+    require(n.valueSmallerThan(k))
     require(levelBelowContainsK(n, k))
+    decreases(size(n))
+    val insertedRight = insertRight(n, k)
     n match {
-      case n@SkipNode(_, _, _, _) => 
+      case n@SkipNode(v, d, r, h) => {
+        r match {
+          case r@SkipNode(valueR, downR, rightR, heightR) => {
+            if (valueR <= k) {
+              sizeDecreasesToTheRight(n)
+              higherLevelIsSubsetofLowerOne(n, r)
+              if (valueR != k) {
+                assert(r.down.valueSmallerThan(k))
+                lem_skipnodeToTheRightAlsoHasKeyToTheRight(d, r.down, k)
+                val nR = insertRight(r, k)
+                sizeDecreasesToTheRight(n)
+                lem_insertRightContainsKey(r, k)
+                (nR, insertedRight) match {
+                  case (nR@SkipNode(_, _, _, _), insertedRight@SkipNode(_, _, _, _)) => {
+                    lem_isInRightSubtreeTransitive(insertedRight, nR, k)
+                  }
+                }
+                // assert(isInRightSubtree(k, insertedRight))
+              }
+            }
+            // else {
+            //   assert(isInRightSubtree(k, insertedRight))
+            // }
+          }
+          case Leaf => () // {
+          //   assert(isInRightSubtree(k, insertedRight))
+          // }
+        }
+      }
     }
-    assume(isInRightSubtree(k, insertRight(n, k))) // TODO : Proof
-    isInRightSubtree(k, insertRight(n, k))
+    isInRightSubtree(k, insertedRight) // TODO : Proof
   }.holds
 
   def lem_plugLowerLevelContainsKBelow(oldCurrentLeftmost: Node, newLowerLeftmost: Node, k: Int): Boolean = {
@@ -461,7 +720,7 @@ case object Leaf extends Node
               if (valueR <= k) {
                 sizeDecreasesToTheRight(n)
                 higherLevelIsSubsetofLowerOne(n, r)
-                if (r.value == k) {
+                if (valueR == k) {
                   n
                 }
                 else {
@@ -749,6 +1008,13 @@ def findNewDown(t: Node, v: Int): Node = t match {
   def hasSameValue(a: Node, b: Node): Boolean = {
     (a,b) match {
       case (aS@SkipNode(vA,_,_,_),bS@SkipNode(vB,_,_,_)) => return vA == vB
+      case _ => return false
+    }
+  }
+
+  def hasSameHeight(a: Node, b: Node): Boolean = {
+    (a,b) match {
+      case (aS@SkipNode(_,_,_,vA),bS@SkipNode(_,_,_,vB)) => return vA == vB
       case _ => return false
     }
   }
@@ -1373,7 +1639,7 @@ def findNewDown(t: Node, v: Int): Node = t match {
     }
   } ensuring (_ => n.isLeaf || size(n) > size(x))
   
-  def lem_inRightSubtreeImpliesLowerMeasure(n: Node, x: Node): Unit = {
+  def lem_inRightSubtreeImpliesLowerMeasure(n: Node, x: Node): Boolean = {
     require(isInRightSubtree(x, n))
     decreases(sizeRight(n))
     n match {
@@ -1388,7 +1654,27 @@ def findNewDown(t: Node, v: Int): Node = t match {
         }
       }
     }
-  } ensuring (_ => sizeRight(n) > sizeRight(x))
+    sizeRight(n) > sizeRight(x)
+  }.holds
+
+  def lem_bothInRightSubtreeWithLowerValue(n: Node, a: Node, b: Node, v1: Int, v2: Int): Boolean = {
+    require(n.isSkipList)
+    require(a.hasValue(v1))
+    require(b.hasValue(v2))
+    require(v1 < v2)
+    require(isInRightSubtree(a, n))
+    require(isInRightSubtree(b, n))
+    n match {
+      case SkipNode(_, _, right, _) => {
+        if (right != a) {
+          lem_isInRightSubtreeImpliesValueIsAlsoIn(n, b, v2)
+          lem_rightSubtreeDoesNotSkipValues(n, a, v2)
+          lem_bothInRightSubtreeWithLowerValue(right, a, b, v1, v2)
+        }
+      }
+    }
+    isInRightSubtree(b, a)
+  }.holds
 
  //_____________________________________________ IS RIGHT proof and lemmas
 
@@ -1440,11 +1726,14 @@ def findNewDown(t: Node, v: Int): Node = t match {
     require(n.isSkipNode)
     require(target.hasValue(v))
     require(isInRightSubtree(target, n))
+    decreases(sizeRight(n))
     n match {
       case n@SkipNode(_, _, right, _) => {
         if (target != right) {
           right match {
-            case r@SkipNode(_, _, _, _) => lem_isInRightSubtreeImpliesValueIsAlsoIn(r, target, v)
+            case r@SkipNode(_, _, _, _) => {
+              lem_isInRightSubtreeImpliesValueIsAlsoIn(r, target, v)
+            }
           }
         }
       }
@@ -1462,10 +1751,11 @@ def findNewDown(t: Node, v: Int): Node = t match {
     }
   } ensuring (_ => n.value < k)
 
-  def lem_inRightSubtreeImpliesDifference(n: Node, x: Node): Unit = {
+  def lem_inRightSubtreeImpliesDifference(n: Node, x: Node): Boolean = {
     require(isInRightSubtree(x, n))
     lem_inRightSubtreeImpliesLowerMeasure(n, x)
-  } ensuring (_ => n != x)
+    n != x
+  }.holds
 
   def lem_isInRightSubtreeInequality(n: Node, a: Node, v: Int): Unit = {
     require(n.isSkipList)
@@ -1566,7 +1856,7 @@ def lem_newDownReturnsSkipNodeOfValue(n: Node, v: Int): Unit = {
         }                         
       }
     }   
-  }.ensuring(_=> findNewDown(n, v).hasValue(v))
+  }.ensuring(_=> findNewDown(n, v).hasValue(v) && hasSameHeight(findNewDown(n, v), n))
 
   def lem_newDownWithTooHighKeyNodeReturnsLeaf(n: Node, k: Int): Unit = {
     require(n.isSkipList)
