@@ -527,11 +527,82 @@ case object Leaf extends Node
     require(a.isSkipNode)
     require(b.isSkipNode)
     require(c.isSkipNode)
+    require(a.isSkipList)
+    require(b.isSkipList)
+    require(c.isSkipList)
     require(isSubsetOf(a, b))
     require(isSubsetOf(b, c))
-    assume(isSubsetOf(a, c)) // TODO : Proof
-    isSubsetOf(a, c)
+    
+    (a,b,c) match {
+      case (an@SkipNode(a_v,_,a_r,_), bn@SkipNode(b_v, _,b_r,_), cn@SkipNode(c_v, _,c_r,_)) =>
+        
+        a_r match {
+          case a_r@SkipNode(_,_,_,_) => 
+            lem_isSubsetOfTransitivity(a_r, b, c)
+          case Leaf =>
+        }
+        assert(isSubsetOf(a_r, c))
+        //        if(a_v != c_v) assert(isInRightSubtree(a_v, cn))
+        lem_valueOfSubsetIsInSuperset(a_v, an, bn)
+        lem_valueOfSubsetIsInSuperset(a_v, bn, cn)
+        if(a_v == c_v) {
+          assert(isSubsetOf(a_r, cn))
+          a_r match{
+            case a_r@SkipNode(v,_,_,_) => 
+              lem_elementOfSkipListIsSkipList(an)
+              assume(a_r.isSkipList)
+              //lem_valueAtRightIsHigher(an, a_r) //TODO easy precond
+              lem_inRightSubtreeImpliesDifference(an, a_r)
+              assume(v != c_v) //TODO but above should be enough
+          }
+          assert(lowerLevelIsStrictSuperset(a_r, cn))
+          assert(isSubsetOf(a, c))
+        }
+        else {
+          assert(isSubsetOf(a_r, c))
+          a_r match{
+            case a_r@SkipNode(v,_,_,_) => 
+              lem_elementOfSkipListIsSkipList(an)
+              lem_valueAtRightIsHigher(an, a_r)
+              assume(v != c_v) //TODO but above should be enough
+              assert(lowerLevelIsStrictSuperset(a_r, cn))
+            case Leaf => 
+              assert(lowerLevelIsStrictSuperset(a_r, cn))
+
+          }
+
+          assert(isInRightSubtree(a_v, c)) // from lem_valueOfSubsetIsInSuperset(a_v, bn, cn)
+          assume(lowerLevelIsStrictSuperset(a_r, cn)) //TODO but proved above
+          assert(lowerLevelIsStrictSuperset(a, cn)) // the 2 above imply this
+          assert(isSubsetOf(a, c))
+        }
+      case (Leaf, _, _) => 
+      case _ => ()
+    }
+    isSubsetOf(a,c)
   }.holds
+  
+  def lem_valueOfSubsetIsInSuperset(v: Int, sub: SkipNode, sup: SkipNode): Unit = {
+    require(sub.isSkipNode)
+    require(sup.isSkipNode)
+    require(isSubsetOf(sub, sup))
+    require(sub.value == v || isInRightSubtree(v, sub))
+
+    if(sub.value != v){
+      assert(isInRightSubtree(v, sub))
+      lem_subsetRightIsSubset(sub, sup)
+      sub.right match {
+        case sn@SkipNode(_,_,_,_) => lem_valueOfSubsetIsInSuperset(v, sn, sup)
+      }
+    }
+
+  } ensuring ( _ => isInRightSubtree(v, sup) || sup.value == v)
+
+  def lem_subsetRightIsSubset(sub: SkipNode, sup: Node): Unit = {
+    require(sup.isSkipNode)
+    require(sub.isSkipNode)
+    require(isSubsetOf(sub, sup))
+  } ensuring ( _ => isSubsetOf(sub.right, sup))
 
   def lem_insertRightReturnsSkipList(n: Node, k: Int): Boolean = {
     require(n.isSkipList)
@@ -1171,12 +1242,12 @@ def findNewDown(t: Node, v: Int): Node = t match {
   }
 
   def isSubsetOf(n: Node, lower: Node): Boolean = {
-    require(n.isSkipNode)
     require(lower.isSkipNode)
     (n, lower) match {
       case (n@SkipNode(value, _, right, _), lower@SkipNode(valueL, _, _, _)) => {
         (lowerLevelIsStrictSuperset(n.right, lower) && value == valueL) || lowerLevelIsStrictSuperset(n, lower)
       }
+      case (Leaf, _) => true
     }
   }
 
@@ -1757,7 +1828,7 @@ def findNewDown(t: Node, v: Int): Node = t match {
 
  //_____________________________________________ IS RIGHT proof and lemmas
 
-  // Proof of isInRightSubTree transitivity : Lemmas that didn't even need to be proven :
+  // Proof of isInRightSubtree transitivity : Lemmas that didn't even need to be proven :
   // If x is in n's right subtree and n.down is not a Leaf, then x.down is not a Leaf
   // If x is in n's right subtree then n is not a Leaf
   def lem_rightIsAlsoInRightSubtree(n: SkipNode, x: SkipNode): Unit = {
@@ -1836,7 +1907,7 @@ def findNewDown(t: Node, v: Int): Node = t match {
     n != x
   }.holds
 
-  def lem_isInRightSubtreeInequality(n: Node, a: Node, v: Int): Unit = {
+  def lem_isInRightSubtreeInequality(n: Node, a: Node, v: Int): Unit = { 
     require(n.isSkipList)
     require(isInRightSubtree(a, n))
     require(isInRightSubtree(v, n))
