@@ -104,30 +104,6 @@ case object Leaf extends Node
 
   //_____________________________________________ INSERT
 
-  // def insert(t: Node, k: Int, insertHeight: Int): Node = {
-  //   require(isSkipList(t))
-  //   require(insertHeight >= 0)
-  //   decreases(size(t))
-  //   t match { // Returns the list with k inserted
-  //     case sn@SkipNode(value, down, right, height) => {
-  //       if (height > insertHeight) { // We are too high, recurse on lower level
-  //         lem_sizeDecreasesDown(sn)
-  //         lem_elementOfSkipListIsSkipList(sn)
-  //         SkipNode(value, insert(down, k, insertHeight), right, height)
-  //       }
-  //       else { //at correct level, insert lower, then insert right
-  //         lem_sizeDecreasesDown(sn)
-  //         val lowerLeftmostNode = insert(down, k, insertHeight)
-  //         assert(isRight(lowerLeftmostNode, k))
-  //         assert(isSkipList(lowerLeftmostNode))
-         
-  //         insertRight(t, k, lowerLeftmostNode) //insert right need new underlying level to update links to down nodes
-  //       }
-  //     }
-  //     case Leaf => Leaf // Found a leaf (we are at level -1)
-  //   }
-  // }
-
   def insertUpwards(k: Int, desiredHeight: BigInt, topLeftmost: Node, currentLeftmost: Node, currentLevel: BigInt, lowerLeftmost: Node): Node = {
     // insertRight in levels 0 to maxHeight
     // if desiredHeight is lower than level, simply updates links to the new subtree
@@ -170,7 +146,7 @@ case object Leaf extends Node
       else {
         val finalCurrentLeftmost = updatedCurrentLeftmost match {
           case updatedCurrentLeftmost@SkipNode(_, _, _, _) => {
-            plugLowerLevelReturnsSkipList(currentLeftmost, lowerLeftmost)
+            lem_plugLowerLevelReturnsSkipList(currentLeftmost, lowerLeftmost)
             insertRight(updatedCurrentLeftmost, k)
           }
         }
@@ -199,7 +175,7 @@ case object Leaf extends Node
       //insert right
       val finalCurrentLeftmost = updatedCurrentLeftmost match {
         case updatedCurrentLeftmost@SkipNode(_, _, _, _) => {
-          plugLowerLevelReturnsSkipList(currentLeftmost, lowerLeftmost)
+          lem_plugLowerLevelReturnsSkipList(currentLeftmost, lowerLeftmost)
           lem_plugLowerLevelContainsKBelow(currentLeftmost, lowerLeftmost, k)
           insertRight(updatedCurrentLeftmost, k)
         }
@@ -211,6 +187,7 @@ case object Leaf extends Node
       lem_plugLowerLevelReturnsSuperset(currentLeftmost, lowerLeftmost)
       lem_insertRightReturnsSuperset(updatedCurrentLeftmost, k)
       lem_isSubsetOfTransitivity(nextCurrentLeftmost, currentLeftmost, updatedCurrentLeftmost)
+      lem_insertRightReturnsSkipList(updatedCurrentLeftmost, k)
       lem_isSubsetOfTransitivity(nextCurrentLeftmost, updatedCurrentLeftmost, finalCurrentLeftmost)
       lem_insertRightContainsKey(updatedCurrentLeftmost, k)
       lem_insertRightReturnsSkipList(updatedCurrentLeftmost, k)
@@ -219,7 +196,7 @@ case object Leaf extends Node
     else { // plug and recurse upwards
       val updatedCurrentLeftmost = plugLowerLevel(currentLeftmost, lowerLeftmost)
       val nextCurrentLeftmost = levelLeftmost(topLeftmost, currentLevel+1)
-      plugLowerLevelReturnsSkipList(currentLeftmost, lowerLeftmost)
+      lem_plugLowerLevelReturnsSkipList(currentLeftmost, lowerLeftmost)
       lem_isDownOf(topLeftmost, nextCurrentLeftmost, currentLeftmost, currentLevel)
       lem_isDownOfImpliesSubset(currentLeftmost, nextCurrentLeftmost)
       lem_plugLowerLevelReturnsSuperset(currentLeftmost, lowerLeftmost)
@@ -245,6 +222,7 @@ case object Leaf extends Node
               else {
                 sizeDecreasesToTheRight(n)
                 lem_insertRightReturnsSuperset(r, k)
+                lem_insertRightReturnsSkipList(n, k)
                 lem_rightIsSubsetOfOtherRightImpliesSubset(n, insertedRight)
                 check(isSubsetOf(n, insertedRight))
               }
@@ -252,7 +230,8 @@ case object Leaf extends Node
             else {
               val nD = findNewDown(d, k)
               val nR = SkipNode(k, nD, r, h)
-              assert(isSubsetOf(r, nR)) // TODO : Proof (true because r is nr's right, so nr is strict superset of r)
+              lem_insertRightReturnsSkipList(n, k)
+              lem_toTheRightIsStrictSubset(r, nR)
               lem_rightIsSubsetOfOtherRightImpliesSubset(n, insertedRight)
               check(isSubsetOf(n, insertedRight))
             }
@@ -266,24 +245,36 @@ case object Leaf extends Node
 
   def lem_rightIsSubsetOfOtherRightImpliesSubset(n: Node, lower: Node): Boolean = {
     require(n.isSkipNode)
+    require(n.isSkipList)
+    require(lower.isSkipList)
     require(lower.isSkipNode)
     require(rightIsSkipNode(n))
     require(rightIsSkipNode(lower))
     require(hasSameValue(n, lower))
-    require(rightIsSubsetOfOtherRightAndSameDown(n, lower))
+    require(rightIsSubsetOfOtherRight(n, lower))
     (n, lower) match {
-      case (n@SkipNode(_, down, right, _), lower@SkipNode(_, downL, rightL, _)) => {
+      case (n@SkipNode(value, down, right, _), lower@SkipNode(valueL, downL, rightL, _)) => {
         (right, rightL) match {
-          case (right@SkipNode(_, _, _, _), rightL@SkipNode(_, _, _, _)) => {
-            assert(isSubsetOf(right, rightL))
+          case (right@SkipNode(v1, _, rightRA, _), rightL@SkipNode(v2, _, _, _)) => {
+            if (lowerLevelIsStrictSuperset(right, rightL)) {
+              lem_toTheRightIsStrictSubset(rightL, lower)
+              lem_isStrictSupersetTransitivity(right, rightL, lower)
+            }
+            else if (lowerLevelIsStrictSuperset(rightRA, rightL) && v1 == v2) {
+              assert(isInRightSubtree(v1, lower))
+              lem_toTheRightIsStrictSubset(rightL, lower)
+              lem_isStrictSupersetTransitivity(rightRA, rightL, lower)
+              check(isSubsetOf(n, lower))
+            }
+            check(isSubsetOf(n, lower))
           }
         }
       }
     }
-    isSubsetOf(n, lower) // TODO : Proof
+    isSubsetOf(n, lower)
   }.holds
 
-  def rightIsSubsetOfOtherRightAndSameDown(n: Node, lower: Node): Boolean = {
+  def rightIsSubsetOfOtherRight(n: Node, lower: Node): Boolean = {
     require(n.isSkipNode)
     require(lower.isSkipNode)
     require(rightIsSkipNode(n))
@@ -292,7 +283,7 @@ case object Leaf extends Node
       case (n@SkipNode(_, down, right, _), lower@SkipNode(_, downL, rightL, _)) => {
         (right, rightL) match {
           case (right@SkipNode(_, _, _, _), rightL@SkipNode(_, _, _, _)) => {
-            isSubsetOf(right, rightL) && down == downL
+            isSubsetOf(right, rightL)
           }
         }
       }
@@ -323,12 +314,39 @@ case object Leaf extends Node
 
   def lem_insertRightZeroHeightReturnsSuperset(n: Node, k: Int): Boolean = {
     require(n.isSkipList)
-    require(n.valueAtMost(k))
+    require(n.valueSmallerThan(k))
     require(n.hasHeight(0))
+    require(n.isSkipNode)
+    decreases(size(n))
     n match {
-      case n@SkipNode(_, _, _, _) => {
-        assume(isSubsetOf(n, insertRightZeroHeight(n, k))) // TODO : Proof
-        isSubsetOf(n, insertRightZeroHeight(n, k))
+      case n@SkipNode(value, _, right, _) => {
+      val insertedRight = insertRightZeroHeight(n, k)
+        if (value != k) {
+          right match {
+            case r@SkipNode(valueR, downR, rightR, heightR) => {
+              if (valueR < k) {
+                sizeDecreasesToTheRight(n)
+                lem_insertRightZeroHeightReturnsSuperset(r, k)
+                lem_insertRightZeroHeightIsSkipList(n, k)
+                lem_rightIsSubsetOfOtherRightImpliesSubset(n, insertedRight)
+                check(isSubsetOf(n, insertedRight))
+              }
+              else if (valueR == k) {
+                lem_isSubsetOfItself(n, r)
+                check(isSubsetOf(n, insertedRight))
+              }
+              else if (valueR > k) {
+                val nR = SkipNode(k, Leaf, n.right, n.height)
+                lem_insertRightZeroHeightIsSkipList(n, k)
+                lem_toTheRightIsStrictSubset(r, nR)
+                lem_rightIsSubsetOfOtherRightImpliesSubset(n, insertedRight)
+                check(isSubsetOf(n, insertedRight))
+              }
+            }
+            case Leaf => ()
+          }
+        }
+      isSubsetOf(n, insertedRight)
       }
     }
   }.holds
@@ -370,16 +388,30 @@ case object Leaf extends Node
     isSubsetOf(n, down)
   }.holds
 
+  def lem_isInRightSubtreeImpliesSkipList(right: Node, n: Node): Boolean = {
+    require(n.isSkipList)
+    require(isInRightSubtree(right, n))
+    n match {
+      case SkipNode(_, _, r, _) => {
+        if (r != right) {
+          lem_isInRightSubtreeImpliesSkipList(right, r)
+        }
+      }
+    }
+    right.isSkipList
+  }.holds
+
   def lem_isInRightSubtreeImpliesSubset(right: Node, n: Node): Boolean = {
     require(n.isSkipNode)
     require(right.isSkipNode)
     require(n.isSkipList)
     require(isInRightSubtree(right, n))
     (n, right) match {
-      case (SkipNode(value, _, r, _), right@SkipNode(_, _, _, _)) => {
+      case (n@SkipNode(value, _, r, _), right@SkipNode(_, _, _, _)) => {
         if (right != r) {
           lem_isInRightSubtreeImpliesSubset(right, r)
           lem_toTheRightIsSubset(r, n)
+          lem_isInRightSubtreeImpliesSkipList(right, n)
           lem_isSubsetOfTransitivity(right, r, n)
         }
         else {
@@ -431,8 +463,25 @@ case object Leaf extends Node
     require(isSubsetOf(currentLeftmost, lowerLeftmost))
     require(nodeHeight(currentLeftmost) > 0)
     require(nodeHeight(currentLeftmost) == nodeHeight(lowerLeftmost) + 1)
-    assume(isSubsetOf(currentLeftmost, plugLowerLevel(currentLeftmost, lowerLeftmost))) // TODO : Proof
-    isSubsetOf(currentLeftmost, plugLowerLevel(currentLeftmost, lowerLeftmost))
+    decreases(size(currentLeftmost))
+
+    val plugged = plugLowerLevel(currentLeftmost, lowerLeftmost)
+    (currentLeftmost, lowerLeftmost) match {
+      case (currentLeftmost@SkipNode(value, down, right, height), lowerLeftmost@SkipNode(valueL, downL, rightL, heightL)) => {
+        val newDown = findNewDown(lowerLeftmost, value)
+        right match {
+          case right@SkipNode(valueR, _, _, _) => {
+            lem_plugLowerLevelReturnsSkipList(currentLeftmost, lowerLeftmost)
+            sizeDecreasesToTheRight(currentLeftmost)
+            lem_plugLowerLevelReturnsSuperset(right, newDown)
+            lem_rightIsSubsetOfOtherRightImpliesSubset(currentLeftmost, plugged)
+            check(isSubsetOf(currentLeftmost, plugged))
+          }
+          case Leaf => () 
+        }
+      }
+    }
+    isSubsetOf(currentLeftmost, plugged)
   }.holds
   
   def lem_isDownOf(n: Node, down1: Node, down2: Node, height: BigInt): Boolean = {
@@ -534,75 +583,155 @@ case object Leaf extends Node
     require(isSubsetOf(b, c))
     
     (a,b,c) match {
-      case (an@SkipNode(a_v,_,a_r,_), bn@SkipNode(b_v, _,b_r,_), cn@SkipNode(c_v, _,c_r,_)) =>
-        
-        a_r match {
-          case a_r@SkipNode(_,_,_,_) => 
-            lem_isSubsetOfTransitivity(a_r, b, c)
-          case Leaf =>
-        }
-        assert(isSubsetOf(a_r, c))
-        //        if(a_v != c_v) assert(isInRightSubtree(a_v, cn))
-        lem_valueOfSubsetIsInSuperset(a_v, an, bn)
-        lem_valueOfSubsetIsInSuperset(a_v, bn, cn)
-        if(a_v == c_v) {
-          assert(isSubsetOf(a_r, cn))
-          a_r match{
-            case a_r@SkipNode(v,_,_,_) => 
-              lem_elementOfSkipListIsSkipList(an)
-              assume(a_r.isSkipList)
-              //lem_valueAtRightIsHigher(an, a_r) //TODO easy precond
-              lem_inRightSubtreeImpliesDifference(an, a_r)
-              assume(v != c_v) //TODO but above should be enough
+      case (a@SkipNode(valueA,_,rightA,_), b@SkipNode(valueB, _,rightB,_), c@SkipNode(valueC,_,rightC,_)) => {
+        if ((lowerLevelIsStrictSuperset(rightB, c) && valueB == valueC)) {
+          if ((lowerLevelIsStrictSuperset(rightA, b) && valueA == valueB)) {
+            rightA match {
+              case SkipNode(valueRA,_,rightRA,_) => {
+                assert(isInRightSubtree(valueRA, b))
+                lem_subsetAndRightSubtreeCombine(c, b, valueRA)
+                assert(lowerLevelIsStrictSuperset(rightB, c))
+                lem_strictSupersetCarriesToTheRight(b, rightA)
+                assert(lowerLevelIsStrictSuperset(rightRA, rightB))
+                lem_isStrictSupersetTransitivity(rightRA, rightB, c)
+              }
+              case Leaf => ()
+            }
           }
-          assert(lowerLevelIsStrictSuperset(a_r, cn))
-          assert(isSubsetOf(a, c))
-        }
-        else {
-          assert(isSubsetOf(a_r, c))
-          a_r match{
-            case a_r@SkipNode(v,_,_,_) => 
-              lem_elementOfSkipListIsSkipList(an)
-              lem_valueAtRightIsHigher(an, a_r)
-              assume(v != c_v) //TODO but above should be enough
-              assert(lowerLevelIsStrictSuperset(a_r, cn))
-            case Leaf => 
-              assert(lowerLevelIsStrictSuperset(a_r, cn))
-
+          else if (lowerLevelIsStrictSuperset(a, b)) {
+            assert(isInRightSubtree(valueA, b))
+            lem_subsetAndRightSubtreeCombine(c, b, valueA)
+            assert(isInRightSubtree(valueA, c))
+            lem_strictSupersetCarriesToTheRight(b, a)
+            assert(lowerLevelIsStrictSuperset(rightA, rightB))
+            lem_isStrictSupersetTransitivity(rightA, rightB, c)
           }
-
-          assert(isInRightSubtree(a_v, c)) // from lem_valueOfSubsetIsInSuperset(a_v, bn, cn)
-          assume(lowerLevelIsStrictSuperset(a_r, cn)) //TODO but proved above
-          assert(lowerLevelIsStrictSuperset(a, cn)) // the 2 above imply this
-          assert(isSubsetOf(a, c))
         }
-      case (Leaf, _, _) => 
-      case _ => ()
+        else if (lowerLevelIsStrictSuperset(b, c)) {
+          if ((lowerLevelIsStrictSuperset(rightA, b) && valueA == valueB)) {
+            assert(isInRightSubtree(valueB, c))
+            lem_isStrictSupersetTransitivity(rightA, b, c)
+          }
+          else if (lowerLevelIsStrictSuperset(a, b)) {
+            lem_isStrictSupersetTransitivity(a, b, c)
+          }
+        }
+      }
     }
     isSubsetOf(a,c)
   }.holds
-  
-  def lem_valueOfSubsetIsInSuperset(v: Int, sub: SkipNode, sup: SkipNode): Unit = {
-    require(sub.isSkipNode)
-    require(sup.isSkipNode)
-    require(isSubsetOf(sub, sup))
-    require(sub.value == v || isInRightSubtree(v, sub))
 
-    if(sub.value != v){
-      assert(isInRightSubtree(v, sub))
-      lem_subsetRightIsSubset(sub, sup)
-      sub.right match {
-        case sn@SkipNode(_,_,_,_) => lem_valueOfSubsetIsInSuperset(v, sn, sup)
+  def lem_isStrictSupersetTransitivity(a: Node, b: Node, c: Node): Boolean = {
+    require(b.isSkipNode)
+    require(c.isSkipNode)
+    require(lowerLevelIsStrictSuperset(a, b))
+    require(lowerLevelIsStrictSuperset(b, c))
+    (a,b,c) match {
+      case (a@SkipNode(valueA,_,rightA,_), b@SkipNode(valueB, _,rightB,_), c@SkipNode(valueC,_,rightC,_)) => {
+        lem_subsetContainsImpliesContains(c, b, valueA)
+        assert(lowerLevelIsStrictSuperset(rightA, b))
+        lem_isStrictSupersetTransitivity(rightA, b, c)
+      }
+      case (Leaf, _, _) => ()
+    }
+    lowerLevelIsStrictSuperset(a, c)
+  }.holds
+
+  def lem_subsetContainsImpliesContains(a: Node, b: Node, v: Int): Boolean = {
+    require(b.isSkipNode)
+    require(a.isSkipNode)
+    require(isInRightSubtree(v, b))
+    require(lowerLevelIsStrictSuperset(b, a))
+    b match {
+      case SkipNode(value, _, right, _) => {
+        right match {
+          case right@SkipNode(valueR, _, _, _) => {
+            if (valueR == v) {
+              check(isInRightSubtree(v, a))
+            }
+            else {
+              lem_subsetContainsImpliesContains(a, right, v)
+              check(isInRightSubtree(v, a))
+            }
+          }
+        }
       }
     }
+    isInRightSubtree(v, a)
+  }.holds
 
-  } ensuring ( _ => isInRightSubtree(v, sup) || sup.value == v)
+  def lem_inRightSubtreeImpliesRightValueAtMost(n: Node, right: Node, v: Int): Boolean = {
+    require(isInRightSubtree(v, n))
+    require(right.isSkipNode)
+    require(n.isSkipList)
+    require(isRightOf(right, n))
+    n match {
+      case SkipNode(_, _, r@SkipNode(rV, _, _, _), _) => {
+        if (rV != v) {
+          lem_isInRightSubtreeImpliesSelfValueIsLower(r, v)
+        }
+      }
+    }
+    right.valueAtMost(v)
+  }.holds
 
-  def lem_subsetRightIsSubset(sub: SkipNode, sup: Node): Unit = {
-    require(sup.isSkipNode)
-    require(sub.isSkipNode)
-    require(isSubsetOf(sub, sup))
-  } ensuring ( _ => isSubsetOf(sub.right, sup))
+  def lem_inRightSubtreeAndLowerValueCombine(n: Node, right: Node, v: Int): Boolean = {
+    require(isInRightSubtree(v, n))
+    require(right.isSkipNode)
+    require(n.isSkipList)
+    require(isRightOf(right, n))
+    require(right.valueSmallerThan(v))
+    n match {
+      case SkipNode(_, _, r@SkipNode(rV, _, _, _), _) => {
+        if (rV != v) {
+          ()
+        }
+      }
+    }
+    isInRightSubtree(v, right)
+  }.holds
+
+  def lem_strictSupersetCarriesToTheRight(n: Node, right: Node): Boolean = {
+    require(lowerLevelIsStrictSuperset(right, n))
+    require(n.isSkipNode)
+    require(right.isSkipNode)
+    require(n.isSkipList)
+    require(right.isSkipList)
+    decreases(size(right))
+    (n, right) match {
+      case (SkipNode(_, _, r, _), right@SkipNode(valueR, _, rightR, _)) => {
+        rightR match {
+          case SkipNode(valueRA, _, rightRA, _) => {
+            lem_inRightSubtreeImpliesRightValueAtMost(n, r, valueR)
+            lem_inRightSubtreeAndLowerValueCombine(n, r, valueRA)
+            lem_toTheRightIsStrictSubset(rightR, right)
+            lem_isStrictSupersetTransitivity(rightR, right, n)
+            sizeDecreasesToTheRight(right)
+            lem_strictSupersetCarriesToTheRight(n, rightR)
+            check(lowerLevelIsStrictSuperset(rightR, r))
+          }
+          case Leaf => ()
+        }
+        lowerLevelIsStrictSuperset(rightR, r)
+      }
+    }
+  }.holds
+
+  def lem_subsetAndRightSubtreeCombine(n: Node, right: Node, v: Int): Boolean = {
+    require(n.isSkipList)
+    require(right.isSkipList)
+    require(n.isSkipNode)
+    require(isSubsetOf(right, n))
+    require(isInRightSubtree(v, right))
+    right match {
+      case SkipNode(_, _, rightR@SkipNode(value, _, _, _) , _) => {
+        if (value != v) {
+          lem_subsetAndRightSubtreeCombine(n, rightR, v)
+        }
+      }
+    }
+    isInRightSubtree(v, n)
+  }.holds
 
   def lem_insertRightReturnsSkipList(n: Node, k: Int): Boolean = {
     require(n.isSkipList)
@@ -808,10 +937,46 @@ case object Leaf extends Node
     require(isSubsetOf(oldCurrentLeftmost, newLowerLeftmost))
     require(nodeHeight(oldCurrentLeftmost) > 0)
     require(nodeHeight(oldCurrentLeftmost) == nodeHeight(newLowerLeftmost) + 1)
+    require(oldCurrentLeftmost.valueSmallerThan(k))
     require(isInRightSubtree(k, newLowerLeftmost))
-    decreases(sizeRight(oldCurrentLeftmost))
-    assume(levelBelowContainsK(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost), k)) // TODO : Proof
-    levelBelowContainsK(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost), k)
+
+    val plugged = plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)
+    (oldCurrentLeftmost, newLowerLeftmost) match {
+      case (oldCurrentLeftmost@SkipNode(value, down, right, height), newLowerLeftmost@SkipNode(valueL, downL, rightL, heightL)) => {
+        val newDown = findNewDown(newLowerLeftmost, value)
+        if (lowerLevelIsStrictSuperset(oldCurrentLeftmost, newLowerLeftmost)) {
+          lem_valueStillInSubtreeAfterNewDown(newLowerLeftmost, value, k)
+        }
+      }
+    }
+    levelBelowContainsK(plugged, k)
+  }.holds
+
+  def lem_valueStillInSubtreeAfterNewDown(n: Node, target: Int, k: Int): Boolean = {
+    require(isInRightSubtree(k, n))
+    require(isInRightSubtree(target, n))
+    require(n.isSkipList)
+    require(target < k)
+    
+    n match {
+      case SkipNode(value, _, right, _) => {
+        lem_inRightSubtreeImpliesRightValueAtMost(n, right, target)
+        lem_inRightSubtreeAndLowerValueCombine(n, right, k)
+        if (value != target) {
+          right match {
+            case SkipNode(valueR, _, _, _) => {
+              if (valueR == target) {
+                check(isInRightSubtree(k, findNewDown(n, target)))
+              }
+              else {
+                lem_valueStillInSubtreeAfterNewDown(right, target, k)
+              }
+            }
+          }
+        }
+      }
+    }
+    isInRightSubtree(k, findNewDown(n, target))
   }.holds
 
   def levelBelowContainsK(n: Node, k: Int): Boolean = {
@@ -899,7 +1064,7 @@ case object Leaf extends Node
   
   def insertRightZeroHeight(n: SkipNode, k: Int): Node = {
     require(n.isSkipList)
-    require(n.value <= k)
+    require(n.valueAtMost(k))
     require(nodeHeight(n) == 0)
     decreases(size(n))
     if (n.value == k) {n}
@@ -1722,7 +1887,7 @@ def findNewDown(t: Node, v: Int): Node = t match {
     }
   } ensuring (levelsAxiom(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
 
-  def plugLowerLevelReturnsSkipList(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Unit = {
+  def lem_plugLowerLevelReturnsSkipList(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Unit = {
     require(oldCurrentLeftmost.isSkipList)
     require(newLowerLeftmost.isSkipList)
     require(oldCurrentLeftmost.isSkipNode)
