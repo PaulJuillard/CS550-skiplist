@@ -1108,13 +1108,14 @@ case object Leaf extends Node
   }
 
   // def insert(sl: SkipList, k: Int, height: BigInt): SkipList = {
-  //   require(isSkipList(sl))
+  //   require(sl.isSkipList)
   //   require(height >= 0)
   //   // if needed, bring first value to same height
-  //   val newHead = increaseHeight(sl.head, height)
-  //   assert(isSkipList(newHead))
-  //   SkipList(insertUpwards(k, height, newHead, 0, Leaf), max(sl.maxHeight, height))
-  // } 
+  //   val newHead = if (height > nodeHeight(sl.head)) {increaseHeight(sl.head, height)} else {sl.head}
+  //   assert(newHead.isSkipList)
+  //   val currentLeftmost = // TODO
+  //   SkipList(insertUpwards(k, height, newHead, currentLeftmost, 0, Leaf), max(sl.maxHeight, height))
+  // }
 
   // def insert(sl: SkipList, k:BigInt): SkipList = {
   //    if (isIn(sl, k)) {
