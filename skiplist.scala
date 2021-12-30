@@ -67,6 +67,7 @@ sealed abstract class Node {
   def heightAtMost(h: BigInt): Boolean = this match {case SkipNode(_, _, _, v) => v <= h; case _ => false}
   def heightAtLeast(h: BigInt): Boolean = this match {case SkipNode(_, _, _, v) => v >= h; case _ => false}
   def hasHeight(h: BigInt): Boolean = this match {case SkipNode(_, _, _, v) => v == h; case _ => false}
+  def getValue(): Int = this match {case SkipNode(v, _, _, _) => v; case _ => Int.MaxValue} 
 }
 case class SkipList(head: Node, maxHeight: BigInt) {
   def isSkipList = isASkipList(this)
@@ -1397,12 +1398,12 @@ def findNewDown(t: Node, v: Int): Node = t match {
 
   //_____________________________________________ GETTERS
   def isInTheList(target: Int, of : Node): Boolean = of match {
-    case SkipNode(value, down, right, height) => isInRightSubtree(target,of) || isInTheList(target,down)
+    case SkipNode(value, down, right, height) => value == target || isInRightSubtree(target,of) || isInTheList(target,down)
     case Leaf => false
   }
 
   def isInTheList(target: Int, of: SkipList): Boolean = {
-    return isInRightSubtree(target,of.head)
+    return isInTheList(target,of.head)
   }
 
   // The node height, all the leaf are at height 0, skipnode at height l+1 where l is their height attribute
@@ -1489,7 +1490,7 @@ def findNewDown(t: Node, v: Int): Node = t match {
       case _ => false
     }
   }
-
+  
   //_____________________________________________ SUBSET
 
   def lowerLevelIsStrictSuperset(n: Node, lower: Node): Boolean = {
@@ -1653,52 +1654,90 @@ def findNewDown(t: Node, v: Int): Node = t match {
   def searchFindsElement(sl: SkipList, v: Int): Unit = {
     require(sl.isSkipList)
     require(isInTheList(v,sl))
+    searchFindsElement(sl.head,v)
   } ensuring (_ => search(sl,v) == Some(v))
 
-  // 8 - If sl is a skiplist and a is not in sl, search(sl, a) returns None ==
-  def searchFindsNone(sl: SkipList, v: Int): Unit = {
-    require(sl.isSkipList)
-    require(!isInTheList(v,sl))
-  } ensuring (_ => search(sl,v) == None())
-
   def searchFindsElement(n: Node, v:Int): Unit = {
-    require(isSkipList(n))
-    require(isInTheList(v,n))  
+    require(n.isSkipList)
+    require(isInTheList(v,n)) 
+    decreases(size(n))
     n match {
       case Leaf => ()
-      case SkipNode(value, down, right, height) => {
+      case n@SkipNode(value, down, right, height) => {
         if (value == v){
-          ()
+          assert(search_(n,v) == Some(v))
         }
-        else if(isInRightSubtree(v, right)){
-          assert(isInRightSubtree(v, right))
-          decreases(sizeRight(n))
-          searchFindsElement(right, v)
-          //assume(nodeForIntInRightSubtree(v,n)!= None())
-        } else {
-          assume(isInTheList(v,down))
-          assume(search_(n,v) == Some(v))
-
+        else {
+          right match {
+            case r@SkipNode(vR,_,_,_) => {
+              if (vR <= v){
+                lem_isInTheListLargerThanNodeImpliesInRightsList(v,n)
+                assert(isInTheList(v,r))
+                sizeDecreasesToTheRight(n)
+                searchFindsElement(r,v)
+              } else {
+                assert(v<vR)
+                lem_isInRightSubtreeImpliesValueHigher(v,r)
+                lem_isInTheListButNotInRightsImpliesDownIsASkipnode(v,n)
+                down match {
+                  case d@SkipNode(vD, _, _, _) => {
+                    lem_isInTheListImpliesInTheListOfDown(v,n)
+                    searchFindsElement(d,v)
+                  }
+                  case Leaf =>()
+                }
+              }
+            }
+            case Leaf => {
+              down match {
+                case d@SkipNode(vD, _, _, _) => {
+                  lem_isInTheListImpliesInTheListOfDown(v,n)
+                  searchFindsElement(d,v)
+                }
+              }
+            }
+          }
         }
       }
     }
   } ensuring (_ => search_(n,v) == Some(v))
 
-  def searchFindsNone(n: Node, v:BigInt): Unit = {
-    require(isSkipList(n))
+// 8 - If sl is a skiplist and a is not in sl, search(sl, a) returns None ==
+  def searchFindsNone(sl: SkipList, v: Int): Unit = {
+    require(sl.isSkipList)
+    require(!isInTheList(v,sl))
+    searchFindsNone(sl.head,v)
+  } ensuring (_ => search(sl,v) == None())
+  
+
+  def searchFindsNone(n: Node, v: Int): Unit = {
+    require(n.isSkipList)
     require(!isInTheList(v,n))
+    decreases(size(n))
     n match {
       case Leaf => ()
-      case SkipNode(value, down, right, height) => {
+      case n@SkipNode(value, d, r, _) => {
         assert(value != v)
-        assert(!isInRightSubtree(v, right))
-        assume(!isInTheList(v,right))
-          searchFindsNone(down,v)
-          searchFindsNone(right,v)
+        assert(!isInRightSubtree(v, r))
+        r match {
+          case r@SkipNode(vR,_,_,_) => 
+            if (vR <= v) { 
+                sizeDecreasesToTheRight(n)
+                lem_notInTheListImpliesNotInRightsList(v,n,r)
+                searchFindsNone(r, v)
+              }
+              else {
+                searchFindsNone(d, v)
+              }
+
+          case Leaf => {
+            searchFindsNone(d, v)
+          }
+        }
       }
     }
-  } ensuring (_ => search(n,v) == None())
-*/
+  } ensuring (_ => search_(n,v) == None())
+  */
 
 //___________________________________________________________________________________________________________________________
 //__________________________________________________________ PROOFS and lemmas ______________________________________________________
@@ -2201,6 +2240,21 @@ def findNewDown(t: Node, v: Int): Node = t match {
     }
   } ensuring (n.height == x.height)
 
+  def lem_notInRightSubtreeImpliesNotInRightsRightSubtree(target: Int, n: SkipNode, x: SkipNode): Unit = {
+    require(n.isSkipList)
+    require(x.isSkipList)
+    require(isInRightSubtree(x, n))
+    require(!isInRightSubtree(target, n))
+
+    n.right match {
+      case r@SkipNode(_, _, _, _) => {
+        if (x != r) {
+          lem_notInRightSubtreeImpliesNotInRightsRightSubtree(target,r, x)
+        }
+      }
+    }
+  } ensuring (!isInRightSubtree(target, x))
+
   def lem_inRightSubtreeHasSameNodeHeight(n: Node, x: Node): Unit = {
     require(n.isSkipList)
     require(x.isSkipList)
@@ -2230,6 +2284,192 @@ def findNewDown(t: Node, v: Int): Node = t match {
     }
   } ensuring (_ => rightNodeHasValueLessThan(n, v))
 
+// IsInTheListLemmas
+
+  def lem_isInTheListImpliesInTheListOfDown(target: Int, of: SkipNode): Unit = {
+    require(isInTheList(target,of))
+    require(of.isSkipList)
+    require(of.down.isSkipNode)
+    if(target != of.value){
+      if (isInRightSubtree(target,of)){
+        higherLevelIsSubsetofLowerOne(target,of)
+      } else {
+        assert(isInTheList(target,of.down))
+      }
+    }
+  } ensuring(isInTheList(target,of.down))
+
+
+  def lem_isInTheListOfLowerImpliesInTheList(target: Int, of: SkipNode): Unit = {
+    require(of.isSkipList)
+    require(isInTheList(target,of.down))
+  } ensuring (isInTheList(target,of))
+
+
+  def lem_isInTheListImpliesHigher(target: Int, of: SkipNode, right: SkipNode): Unit = {
+    require(of.isSkipList)
+    require(isInRightSubtree(right,of))
+    require(isInTheList(target,of))
+    require(right.valueAtMost(target))
+    decreases(size(of))
+    lem_isInRightSubtreeImpliesSkipList(right,of)
+    of.down match {
+      case Leaf => {
+        higherLevelIsSubsetofLowerOne(of,right)
+        lem_isInRightSubtreeImpliesValueIsAlsoIn(of,right,right.value)
+        lem_isInRightSubtreeImpliesSelfValueIsLower(of,right.value)
+        assert(of.right.isSkipNode)
+        of.right match{
+          case r@SkipNode(_,_,_,_) => 
+            if(r == right){
+              assert(isInTheList(target,right))
+            } else {
+              assert(isInRightSubtree(target,of.right))
+              lem_isInRightSubtreeImpliesSelfValueIsLower(r,target)
+              lem_inRightSubtreeAndLowerValueCombine(of,r,target)
+              lem_elementOfSkipListIsSkipList(of)
+              lem_isInTheListImpliesHigher(target,r,right)
+            }
+        }
+      }
+      case d@SkipNode(_, _, _, _) => {
+        higherLevelIsSubsetofLowerOne(of,right)
+        lem_inRightSubtreeHasSameHeight(of,right)
+        assert(right.down.isSkipNode)
+        right.down match {
+          case rD@SkipNode(_, _, _, _) => {
+            lem_elementOfSkipListIsSkipList(of)
+            lem_isInTheListImpliesInTheListOfDown(target,of)
+            lem_sizeDecreasesDown(of)
+            lem_isInTheListImpliesHigher(target,d,rD)
+          }
+        }
+      }
+    }
+  } ensuring (isInTheList(target,right))
+  
+  def lem_notInTheListImpliesNotInRightsList(target: Int, of: SkipNode,right: SkipNode): Unit = {
+    require(of.isSkipList)
+    require(isInRightSubtree(right,of))
+    require(!isInTheList(target,of))
+    lem_isInRightSubtreeImpliesSkipList(right,of)
+    of.down match {
+      case Leaf => {
+        higherLevelIsSubsetofLowerOne(of,right)
+        lem_isInRightSubtreeImpliesValueIsAlsoIn(of,right,right.value)
+        lem_isInRightSubtreeImpliesSelfValueIsLower(of,right.value)
+        lem_notInRightSubtreeImpliesNotInRightsRightSubtree(target,of,right)
+      }
+      case d@SkipNode(_, _, _, _) => {
+        higherLevelIsSubsetofLowerOne(of,right)
+        lem_inRightSubtreeHasSameHeight(of,right)
+        assert(right.down.isSkipNode)
+        right.down match {
+          case rD@SkipNode(_, _, _, _) => {
+            lem_elementOfSkipListIsSkipList(of)
+            lem_sizeDecreasesDown(of)
+            lem_notInTheListImpliesNotInRightsList(target,d,rD)
+            lem_notInRightSubtreeImpliesNotInRightsRightSubtree(target,of,right)
+          }
+        }
+      }
+    }
+  } ensuring(!isInTheList(target,right))
+
+  def lem_lowerRightHasSmallerValueThanRight(target: Int, of: SkipNode, down: SkipNode): Unit = {
+    require(of.isSkipList)
+    require(of.down == down)
+    of.right match {
+      case Leaf => assert(down.right.getValue()<= of.right.getValue())
+      case r@SkipNode(vR, dR, _, _) => {
+        higherLevelIsSubsetofLowerOne(of,r)
+        if (dR==down.right){
+          assert(down.right.getValue()<= of.right.getValue())
+        } else {
+          down.right match {
+            case downR@SkipNode(vDR, _, _, _) => {
+              lem_isInRightSubtreeImpliesValueIsAlsoIn(downR,dR,dR.getValue())
+              lem_isInRightSubtreeImpliesSelfValueIsLower(downR, dR.getValue())
+            }
+            case Leaf => assert(down.right.getValue()<= of.right.getValue())
+          }
+        }
+      }
+    }
+  } ensuring (down.right.getValue()<= of.right.getValue())
+  
+  
+  def lem_isInTheListLargerThanNodeImpliesInRightsList(target: Int, of: SkipNode): Unit = {
+    require(isInTheList(target,of))
+    require(of.isSkipList)
+    require(of.right.valueAtMost(target))
+    decreases(size(of)+2)
+    
+    assert(target != of.value)
+    if (isInRightSubtree(target,of)){
+      assert(isInTheList(target,of.right))
+    } else {
+      lem_isInTheListButNotInRightsImpliesDownIsASkipnode(target,of)
+      lem_isInTheListImpliesInTheListOfDown(target,of)
+      lem_elementOfSkipListIsSkipList(of)
+      of.down match {
+        case d@SkipNode(value, down, right, height) => {
+          lem_lowerRightHasSmallerValueThanRight(target,of,d)
+          lem_isInTheListLargerThanNodeImpliesInRightsList(target,d)
+          of.right match {
+            case r@SkipNode(vR, dR, rR, hR) => {
+              lem_isInTheListImpliesHigher(target,of,r)
+              assert(isInTheList(target,r))
+          }
+            case Leaf => assert(isInTheList(target,of.right))
+          }
+        }
+        case Leaf => assert(isInTheList(target,of.right))
+      }
+    }
+  } ensuring(isInTheList(target,of.right))
+  
+  def lem_isInTheListButNotInRightsImpliesDownIsASkipnode(target: Int, of: SkipNode):Unit = {
+    require(of.isSkipList)
+    require(isInTheList(target,of))
+    require(!isEqualOrInRightSubtree(target,of))
+    
+    assert(of.value != target)
+    assert(!isInRightSubtree(target,of))
+    assert(isInTheList(target,of.down))
+    assert(!of.down.isLeaf)
+  } ensuring(!of.down.isLeaf)
+
+  def lem_isInTheListImpliesInTheListOfLowerOne(target: Int, of : SkipNode): Unit = {
+    require(of.isSkipList)
+    require(isInTheList(target,of))
+    require(of.down.isSkipNode)
+    if(isInRightSubtree(target,of)){
+      higherLevelIsSubsetofLowerOne(target,of)
+    }
+  } ensuring(isInTheList(target,of.down))
+
+  def lem_isInRightSubtreeImpliesValueHigher(target: Int, of: Node): Unit = {
+    require(of.isSkipList)
+    require(of.isSkipNode)
+    require(of.valueHigherThan(target))
+    decreases(sizeRight(of))
+    of match {
+      case of@SkipNode(value, down, r, height) => {
+        r match {
+          case r@SkipNode(valueR, _, rightR, _) => {
+            lem_elementOfSkipListIsSkipList(of)
+            lem_valueAtRightIsHigher(of,r)
+            assert(valueR>value)
+            assert(valueR>target)
+            lem_isInRightSubtreeImpliesValueHigher(target,r)
+          }
+          case Leaf => ()
+        }
+      }
+    }
+  } ensuring(!isInRightSubtree(target,of))
+  
 //_____________________________________________ NEWDOWN proof
 
 def lem_newDownReturnsSkipList(t: Node, v: Int): Unit = {
