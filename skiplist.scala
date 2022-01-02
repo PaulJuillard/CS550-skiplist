@@ -115,7 +115,8 @@ case object Leaf extends Node
     require(topLeftmost.isSkipNode)
     require(currentLeftmost.isSkipNode)
     require(topLeftmost.hasValue(Int.MinValue))
-    require(desiredHeight >= 1)
+    require(lowerLeftmost.hasValue(Int.MinValue))
+    require(desiredHeight >= 0)
     require(currentLevel <= nodeHeight(topLeftmost))
     require(desiredHeight <= nodeHeight(topLeftmost))
     require(currentLevel >= 1)
@@ -181,7 +182,7 @@ case object Leaf extends Node
       //plug lower level
       val updatedCurrentLeftmost = plugLowerLevel(currentLeftmost, lowerLeftmost)
       assert(currentLeftmost.hasValue(Int.MinValue))
-      assume(lowerLeftmost.hasValue(Int.MinValue)) //TODO
+      assert(lowerLeftmost.hasValue(Int.MinValue))
       lem_plugLowerLevelOnSameValueIsLowerOf(currentLeftmost, lowerLeftmost)
 
       //insert right
@@ -210,7 +211,7 @@ case object Leaf extends Node
     else { // plug and recurse upwards
       val updatedCurrentLeftmost = plugLowerLevel(currentLeftmost, lowerLeftmost)
       assert(currentLeftmost.hasValue(Int.MinValue))
-      assume(lowerLeftmost.hasValue(Int.MinValue)) //TODO easy
+      assert(lowerLeftmost.hasValue(Int.MinValue))
       lem_plugLowerLevelOnSameValueIsLowerOf(currentLeftmost, lowerLeftmost)
       val nextCurrentLeftmost = levelLeftmost(topLeftmost, currentLevel+1)
       lem_plugLowerLevelReturnsSkipList(currentLeftmost, lowerLeftmost)
@@ -222,7 +223,10 @@ case object Leaf extends Node
       lem_isLowerOfTransitivity(x, updatedCurrentLeftmost, lowerLeftmost)
       x
     }
-  } ensuring(res => res.isSkipList && res.hasValue(Int.MinValue) && isLowerOf(lowerLeftmost, res))
+  } ensuring(res => res.isSkipList && 
+                    res.hasValue(Int.MinValue) && 
+                    isLowerOf(lowerLeftmost, res) && 
+                    nodeHeight(res) == nodeHeight(topLeftmost))
 
   def lem_insertRightReturnsSuperset(n: Node, k: Int): Boolean = {
     require(n.isSkipList)
@@ -1168,7 +1172,7 @@ case object Leaf extends Node
     }
   } ensuring ( _ => increaseHeight(n, newHeight).hasValue(Int.MinValue))
   
-  def lem_increaseHeightReturnsHeigherNode(n: Node, newHeight: BigInt): Unit = {
+  def lem_increaseHeightReturnsHigherNode(n: Node, newHeight: BigInt): Unit = {
     require(n.isSkipList)
     require(newHeight >= nodeHeight(n))
     require(n.hasValue(Int.MinValue))
@@ -1182,13 +1186,13 @@ case object Leaf extends Node
         } 
         else {
           val up = SkipNode(value, n, Leaf, height+1)
-          lem_increaseHeightReturnsHeigherNode(up, newHeight)
+          lem_increaseHeightReturnsHigherNode(up, newHeight)
           ()
         }
       }
       case Leaf => ()
     }
-  } ensuring ( _ => nodeHeight(increaseHeight(n, newHeight)) >= nodeHeight(n))
+  } ensuring ( _ => nodeHeight(increaseHeight(n, newHeight)) == newHeight)
 
   def insert(sl: SkipList, k: Int, height: BigInt): SkipList = {
     require(sl.isSkipList)
@@ -1199,20 +1203,16 @@ case object Leaf extends Node
                     assert(height > nodeHeight(sl.head))
                     lem_increaseHeightReturnsSkiplist(sl.head, height)
                     lem_increaseHeightReturnsMinValueNode(sl.head, height)
+                    lem_increaseHeightReturnsHigherNode(sl.head, height)
                     increaseHeight(sl.head, height)
                   } else {
+                    check(height <= nodeHeight(sl.head))
                     sl.head
                   }
 
     assert(newHead.isSkipList)
     assert(newHead.hasValue(Int.MinValue))
-    if (height > nodeHeight(sl.head)) {
-      lem_increaseHeightReturnsHeigherNode(sl.head, height)
-      assume(height <= nodeHeight(newHead)) //TODO je galère mais ca doit etre simple
-    } else {
-      assert(height <= nodeHeight(sl.head))
-      assert(height <= nodeHeight(newHead))
-    }
+    assert(height <= nodeHeight(newHead))
 
     if(k == Int.MinValue) {
       assert(headIsMinInt(sl))
@@ -1245,16 +1245,28 @@ case object Leaf extends Node
       val newNewHead = insertUpwards(k, height, newHead, oneLeftmost, 1, levelZero)
       assert(newNewHead.isSkipList)
       assert(newNewHead.hasValue(Int.MinValue))
-      assert(isLowerOf(levelZero, newNewHead)) //TODO la "vraie" complexité
+      assert(isLowerOf(levelZero, newNewHead))
       lem_isInListIfInZero(k, newNewHead, levelZero)
-      val x = SkipList(newNewHead, max(sl.maxHeight, height))
-      assert(x.head == newNewHead)
-      assume(headIsMinInt(x)) //TODO
-      assert(x.isSkipList)
-      x
+      if(sl.maxHeight < height) {
+        val x = SkipList(newNewHead, height)
+        assert(x.head.hasValue(Int.MinValue))
+        assert(nodeHeight(newNewHead) == height)
+        assert(headIsMinInt(x))
+        assert(x.isSkipList)
+        x
+      }
+      else {
+        val x = SkipList(newNewHead, sl.maxHeight)
+        assert(x.head.hasValue(Int.MinValue))
+        assert(nodeHeight(x.head) == x.maxHeight)
+        assert(headIsMinInt(x))
+        assert(x.isSkipList)
+        x
+      }
+      
     }
     else {
-      assume(isInTheList(k, levelZero))
+      assert(isInTheList(k, levelZero))
       SkipList(levelZero,  max(sl.maxHeight, height))
     }
   } ensuring ( res => isInTheList(k, res) && res.isSkipList)
@@ -1282,7 +1294,7 @@ case object Leaf extends Node
     require(isLowerOf(bot, mid))
     require(top.isSkipList)
     require(mid.isSkipList)
-    decreases(nodeHeight(top) + nodeHeight(mid))
+    decreases(size(top) + size(mid))
     top match {
       case top@SkipNode(_, down, _,_) =>
 
@@ -1296,6 +1308,8 @@ case object Leaf extends Node
                 assert(isLowerOf(down2, down))
                 lem_isLowerOfDownIfNeq(bot, mid)
                 assert(isLowerOf(bot, down2))
+                lem_sizeDecreasesDown(top)
+                lem_sizeDecreasesDown(mid)
                 lem_isLowerOfTransitivity(down, down2, bot)
               }
             case Leaf => () //does not happen by require
@@ -1304,6 +1318,7 @@ case object Leaf extends Node
         else {
           lem_isLowerOfDownIfNeq(mid, top)
           assert(isLowerOf(mid, down))
+          lem_sizeDecreasesDown(top)
           lem_isLowerOfTransitivity(down, mid, bot)
         }
       case Leaf => () //does not happen because of require
@@ -1327,7 +1342,25 @@ case object Leaf extends Node
     require(nodeHeight(oldCurrentLeftmost) > 0)
     require(nodeHeight(oldCurrentLeftmost) == nodeHeight(newLowerLeftmost) + 1)
     require(oldCurrentLeftmost.getValue() == newLowerLeftmost.getValue())
-  } ensuring (isLowerOf(oldCurrentLeftmost, newLowerLeftmost))
+
+    (oldCurrentLeftmost, newLowerLeftmost) match {
+      case (oldCurrentLeftmost@SkipNode(value, down, right, height), newLowerLeftmost@SkipNode(valueL, downL, rightL, heightL)) => {
+        val newDown = findNewDown(newLowerLeftmost, value)
+        check(newDown == newLowerLeftmost)
+        right match {
+          case right@SkipNode(valueR, _, _, _) => {
+            assert(isLowerOf(newDown, plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
+            assert(isLowerOf(newLowerLeftmost, plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
+            ()
+          }
+          case Leaf => 
+            assert(isLowerOf(newDown, plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
+            assert(isLowerOf(newLowerLeftmost, plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
+            ()
+        }
+      }
+    }
+  } ensuring (isLowerOf(newLowerLeftmost, plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
 
   // def insert(sl: SkipList, k:BigInt): SkipList = {
   //    if (isIn(sl, k)) {
