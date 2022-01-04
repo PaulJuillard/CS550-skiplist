@@ -74,7 +74,17 @@ package object utils {
     }
   }
 
-  // TODO STOPPED HERE
+  def rightNodeHasValueLessThan(n: Node, v: Int): Boolean = {
+    n match {
+      case SkipNode(_, _, right, _) => right match {
+        case SkipNode(value, _, _, _) => value < v
+        case Leaf => false
+      }
+      case Leaf => false
+    }
+  }
+
+  // True if all values in n and its right subtree are in lower's right subtree
   def lowerLevelIsStrictSuperset(n: Node, lower: Node): Boolean = {
     n match {
       case SkipNode(value, _, right, _) => {
@@ -84,7 +94,7 @@ package object utils {
     }
   }
 
-  // True if 
+  // True if all values in n and its right subtree are in lower and it's right subtree
   def isSubsetOf(n: Node, lower: Node): Boolean = {
     require(lower.isSkipNode)
     (n, lower) match {
@@ -95,6 +105,7 @@ package object utils {
     }
   }
 
+  // True if the target node is in of's right subtree
   def isInRightSubtree(target: Node, of: Node): Boolean = {
     (target, of) match {
       case (Leaf, Leaf) => false 
@@ -106,6 +117,7 @@ package object utils {
     }
   }
 
+  // True if the target value is in of's right subtree
   def isInRightSubtree(target: Int, of: Node): Boolean = {
     of match {
       case SkipNode(_, _, r@SkipNode(vRight, _, _, _), _) => {
@@ -115,8 +127,18 @@ package object utils {
     }
   }
 
+  def isEqualOrInRightSubtree(target: Node, of: Node): Boolean = {
+    return (target == of || isInRightSubtree(target,of))
+  }
 
-  // The node height, all the leaf are at height 0, skipnode at height l+1 where l is their height attribute
+  def isEqualOrInRightSubtree(target: Int, of: Node): Boolean = {
+    of match {
+      case SkipNode(v,_,_,_) => (target == v || isInRightSubtree(target,of))
+      case _ => false
+    }
+  }
+
+  // Node height, can be applied to Leaves as well
   def nodeHeight(n: Node): BigInt = {
     require(n.isSkipList)
     val nH: BigInt = n match {
@@ -126,6 +148,7 @@ package object utils {
     nH
   }.ensuring(res => res >= 0 && (n.isLeaf || n.hasHeight(res)))
 
+  // Returns the number of nodes in the skiplist
   def size(t: Node): BigInt = {
     val s: BigInt = t match {
       case SkipNode(value, down, right, height) => 1 + size(down) + sizeRight(right)
@@ -134,15 +157,16 @@ package object utils {
     s
   } ensuring (res => res >= 0)
 
-  def sizeRight(t: Node): BigInt = {
-    val sZ: BigInt = t match {
+  // Returns the number of nodes to the right of n
+  def sizeRight(n: Node): BigInt = {
+    val sZ: BigInt = n match {
       case SkipNode(value, down, right, height) => 1 + sizeRight(right)
       case Leaf => 0
     }
     sZ
   } ensuring (res => res >= 0)
 
-  // True n's right node is a subset of lower's right node
+  // True if n's right node is a subset of lower's right node
   def rightIsSubsetOfOtherRight(n: Node, lower: Node): Boolean = {
     require(n.isSkipNode)
     require(lower.isSkipNode)
@@ -159,6 +183,7 @@ package object utils {
     }
   }
 
+  // True if k is in n.down's right subtree
   def levelBelowContainsK(n: Node, k: Int): Boolean = {
     require(n.isSkipNode)
     n match {
@@ -166,55 +191,34 @@ package object utils {
     }
   }
 
-  def findNewDown(t: Node, v: Int): Node = t match {
+  // Returns the node with value v if it's in n's right subtree, otherwise a Leaf
+  def findNewDown(n: Node, v: Int): Node = n match {
     case SkipNode(value, down, right, height) => {
-      if (value == v) {t}
+      if (value == v) {n}
       else {findNewDown(right, v)}
     }
     case Leaf => Leaf
   }
 
-  def isInTheList(target: Int, of : Node): Boolean = of match {
-    case SkipNode(value, down, right, height) => value == target || isInRightSubtree(target,of) || isInTheList(target,down)
-    case Leaf => false
-  }
-
+  // True if target value is somewhere in the skiplist
   def isInTheList(target: Int, of: SkipList): Boolean = {
     return isInTheList(target,of.head)
   }
 
-  //_____________________________________________ RIGHT AND DOWN
-
-  def rightNodeHasValueLessThan(n: Node, v: Int): Boolean = {
-    n match {
-      case SkipNode(_, _, right, _) => right match {
-        case SkipNode(value, _, _, _) => value < v
-        case Leaf => false
-      }
-      case Leaf => false
-    }
-  }
-
-  def isEqualOrInRightSubtree(target: Node, of: Node): Boolean = {
-    return (target == of || isInRightSubtree(target,of))
-  }
-
-  def isEqualOrInRightSubtree(target: Int, of: Node): Boolean = {
-    of match {
-      case SkipNode(v,_,_,_) => (target == v || isInRightSubtree(target,of))
-      case _ => false
-    }
+  // True if target value is somewhere in the skiplist
+  def isInTheList(target: Int, of : Node): Boolean = of match {
+    case SkipNode(value, down, right, height) => value == target || isInRightSubtree(target,of) || isInTheList(target,down)
+    case Leaf => false
   }
   
-  //_____________________________________________ SUBSET
-  
-  def levelLeftmost(t: Node, level: BigInt): Node = {
-    require(t.isSkipList)
-    require(t.hasValue(Int.MinValue))
+  // Given a topmost node n, return the node with height level when going straight down from n
+  def levelLeftmost(n: Node, level: BigInt): Node = {
+    require(n.isSkipList)
+    require(n.hasValue(Int.MinValue))
     require(level >= 0)
-    require(level <= nodeHeight(t))
-    decreases(nodeHeight(t) - level)
-    val res: Node = t match {
+    require(level <= nodeHeight(n))
+    decreases(nodeHeight(n) - level)
+    val res: Node = n match {
       case sn@SkipNode(value,down,_,height) =>
         assert(height >= level)
         if (height > level) {
@@ -226,5 +230,5 @@ package object utils {
         }
     }
     res
-  } ensuring (res => res.isSkipList && res.hasValue(Int.MinValue) && res.hasHeight(level) && isLowerOf(res, t))
+  } ensuring (res => res.isSkipList && res.hasValue(Int.MinValue) && res.hasHeight(level) && isLowerOf(res, n))
 }
