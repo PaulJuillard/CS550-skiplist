@@ -23,7 +23,6 @@ package object skiplist {
     def heightAtMost(h: BigInt): Boolean = this match {case SkipNode(_, _, _, v) => v <= h; case _ => false}
     def heightAtLeast(h: BigInt): Boolean = this match {case SkipNode(_, _, _, v) => v >= h; case _ => false}
     def hasHeight(h: BigInt): Boolean = this match {case SkipNode(_, _, _, v) => v == h; case _ => false}
-    def getValue(): Int = this match {case SkipNode(v, _, _, _) => v; case _ => Int.MaxValue} 
   }
 
   case class SkipList(head: Node, maxHeight: BigInt) {
@@ -337,7 +336,7 @@ package object skiplist {
       else {
         val x = SkipList(newNewHead, sl.maxHeight)
         assert(x.head.hasValue(Int.MinValue))
-        assert(nodeHeight(x.head) == x.maxHeight)
+        assert(nodeHeight(x.head) <= x.maxHeight)
         assert(headIsMinInt(x))
         assert(x.isSkipList)
         x

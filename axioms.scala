@@ -28,7 +28,7 @@ package object axioms {
   }
 
   // Given a node, if it is not at level 0, it should point to a node one level lower with the same value
-  // If it is at level 0 already, it should point to a Leaf
+  // If it is at level 0 already, it should point to a Leaf. Recursive
   def heightDecreasesDown(node : Node): Boolean = {
     require(hasNonNegativeHeight(node))
     node match {
@@ -44,7 +44,7 @@ package object axioms {
     }
   }
 
-  // Given a node u, its right neighbour should have a value strictly greater than u's and the same height
+  // Given a node u, its right neighbour should have a value strictly greater than u's and the same height. Recursive
   def increasesToTheRight(t: Node): Boolean = t match {
     case SkipNode(value, down, right, height) => right match {
       case SkipNode(valueR, _, _, heightR) => (
@@ -61,6 +61,7 @@ package object axioms {
     case Leaf => true
   }
 
+  // If at level h, b is the right node of a, then b.down is in the right subtree of a.down
   def levelsAxiom(t: Node): Boolean = {
     t match {
       case SkipNode(value, down, right, height) => right match {

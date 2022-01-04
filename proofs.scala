@@ -883,7 +883,7 @@ package object proofs {
     require(isSubsetOf(oldCurrentLeftmost, newLowerLeftmost))
     require(nodeHeight(oldCurrentLeftmost) > 0)
     require(nodeHeight(oldCurrentLeftmost) == nodeHeight(newLowerLeftmost) + 1)
-    require(oldCurrentLeftmost.getValue() == newLowerLeftmost.getValue())
+    require(hasSameValue(oldCurrentLeftmost, newLowerLeftmost))
 
     (oldCurrentLeftmost, newLowerLeftmost) match {
       case (oldCurrentLeftmost@SkipNode(value, down, right, height), newLowerLeftmost@SkipNode(valueL, downL, rightL, heightL)) => {
@@ -1518,27 +1518,25 @@ package object proofs {
     }
   } ensuring(!isInTheList(target,right))
 
-  def lem_lowerRightHasSmallerValueThanRight(target: Int, of: SkipNode, down: SkipNode): Unit = {
+  def lem_lowerRightHasSmallerValueThanRight(of: SkipNode, down: SkipNode): Unit = {
     require(of.isSkipList)
-    require(of.down == down)
+    require(isDownOf(down, of))
     of.right match {
-      case Leaf => assert(down.right.getValue()<= of.right.getValue())
+      case Leaf => ()
       case r@SkipNode(vR, dR, _, _) => {
         higherLevelIsSubsetofLowerOne(of,r)
-        if (dR==down.right){
-          assert(down.right.getValue()<= of.right.getValue())
-        } else {
-          down.right match {
-            case downR@SkipNode(vDR, _, _, _) => {
-              lem_isInRightSubtreeImpliesValueIsAlsoIn(downR,dR,dR.getValue())
-              lem_isInRightSubtreeImpliesSelfValueIsLower(downR, dR.getValue())
+        if (dR!=down.right) {
+          (down.right, dR) match {
+            case (downR@SkipNode(_, _, _, _), dR@SkipNode(vdR, _, _, _)) => {
+              lem_isInRightSubtreeImpliesValueIsAlsoIn(downR, dR, vdR)
+              lem_isInRightSubtreeImpliesSelfValueIsLower(downR, vdR)
             }
-            case Leaf => assert(down.right.getValue()<= of.right.getValue())
+            case (Leaf, _) => ()
           }
         }
       }
     }
-  } ensuring (down.right.getValue()<= of.right.getValue())
+  } ensuring (hasValueAtLeast(of.right, down.right) || of.right.isLeaf)
   
   
   def lem_isInTheListLargerThanNodeImpliesInRightsList(target: Int, of: SkipNode): Unit = {
@@ -1556,7 +1554,7 @@ package object proofs {
       lem_elementOfSkipListIsSkipList(of)
       of.down match {
         case d@SkipNode(value, down, right, height) => {
-          lem_lowerRightHasSmallerValueThanRight(target,of,d)
+          lem_lowerRightHasSmallerValueThanRight(of,d)
           lem_isInTheListLargerThanNodeImpliesInRightsList(target,d)
           of.right match {
             case r@SkipNode(vR, dR, rR, hR) => {
