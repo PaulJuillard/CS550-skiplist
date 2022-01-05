@@ -11,7 +11,6 @@ import stainless.collection._
 import stainless.proof.check
 
 package object skiplist {
-
   sealed abstract class Node {
     def isSkipList = isASkipList(this)
     def isSkipNode = this match {case Leaf => false; case _ => true}
@@ -50,7 +49,6 @@ package object skiplist {
           }
         }
     case Leaf => None()
-
   }
 
   def search(sl: SkipList, target: Int): Option[Int] = {
@@ -104,8 +102,6 @@ package object skiplist {
     else if (currentLevel <= desiredHeight) { // Insert at current level and recurse upwards
       //plug lower level
       val updatedCurrentLeftmost = plugLowerLevel(currentLeftmost, lowerLeftmost)
-      assert(currentLeftmost.hasValue(Int.MinValue))
-      assert(lowerLeftmost.hasValue(Int.MinValue))
       lem_plugLowerLevelOnSameValueIsLowerOf(currentLeftmost, lowerLeftmost)
 
       //insert right
@@ -133,8 +129,6 @@ package object skiplist {
     }
     else { // plug and recurse upwards
       val updatedCurrentLeftmost = plugLowerLevel(currentLeftmost, lowerLeftmost)
-      assert(currentLeftmost.hasValue(Int.MinValue))
-      assert(lowerLeftmost.hasValue(Int.MinValue))
       lem_plugLowerLevelOnSameValueIsLowerOf(currentLeftmost, lowerLeftmost)
       val nextCurrentLeftmost = levelLeftmost(topLeftmost, currentLevel+1)
       lem_plugLowerLevelReturnsSkipList(currentLeftmost, lowerLeftmost)
@@ -173,9 +167,7 @@ package object skiplist {
               lem_newDownIsInRightSubtreeOfOld(newLowerLeftmost, value)
               lem_inRightSubtreeHasSameNodeHeight(newLowerLeftmost, newDown)
               lem_toTheRightIsStillSuperset(newLowerLeftmost, newDown, right, valueR)
-              assert(isSubsetOf(right, newDown))
             }
-            assert(isSubsetOf(right, newDown))
             SkipNode(value, newDown, plugLowerLevel(right, newDown), height)
           }
           case Leaf => SkipNode(value, newDown, Leaf, height)
@@ -204,7 +196,6 @@ package object skiplist {
                   n
                 }
                 else {
-                  assert(r.down.valueSmallerThan(k))
                   lem_skipnodeToTheRightAlsoHasKeyToTheRight(d, r.down, k)
                   val newRight = insertRight(r, k)
                   SkipNode(v, d, newRight, h)
@@ -254,7 +245,7 @@ package object skiplist {
     }
   }
 
-  // boil node up to level newHeight
+  // boil first node up (Int.MinValue) to level newHeight
   def increaseHeight(n: Node, newHeight:BigInt): Node = {
     require(n.isSkipList)
     require(newHeight >= nodeHeight(n))
@@ -278,7 +269,6 @@ package object skiplist {
     
     // if needed, bring first value to same height
     val newHead = if (height > nodeHeight(sl.head)) {
-                    assert(height > nodeHeight(sl.head))
                     lem_increaseHeightReturnsSkiplist(sl.head, height)
                     lem_increaseHeightReturnsMinValueNode(sl.head, height)
                     lem_increaseHeightReturnsHigherNode(sl.head, height)
@@ -288,63 +278,36 @@ package object skiplist {
                     sl.head
                   }
 
-    assert(newHead.isSkipList)
-    assert(newHead.hasValue(Int.MinValue))
-    assert(height <= nodeHeight(newHead))
-
     if(k == Int.MinValue) {
-      assert(headIsMinInt(sl))
-      assert(isInTheList(k, sl))
       return sl
     }
 
     val zeroLeftmost = levelLeftmost(newHead, 0)
-    assert(zeroLeftmost.isSkipNode)
     val levelZero = zeroLeftmost match {
       case z@SkipNode(_,_,_,_) => 
         lem_insertRightZeroHeightIsSkipList(z,k)
         lem_insertRightZeroHeightContainsK(z,k)
         lem_insertRightZeroHeightReturnsSuperset(z,k)
         insertRightZeroHeight(z, k)
-    } 
-    assert(isInRightSubtree(k, levelZero))
-    assert(isInTheList(k, levelZero))
-
+    }
     if(nodeHeight(newHead) > 0) {
       val oneLeftmost = levelLeftmost(newHead, 1)
-      assert(oneLeftmost.isSkipList)
-      assert(oneLeftmost.hasValue(Int.MinValue))
-      assert(nodeHeight(oneLeftmost) == 1)
       lem_isDownOf(newHead, oneLeftmost, zeroLeftmost, 0)
       lem_isDownOfImpliesSubset(zeroLeftmost, oneLeftmost)
       lem_isSubsetOfTransitivity(oneLeftmost, zeroLeftmost, levelZero)
-      assert(isLowerOf(oneLeftmost,newHead))
-      assert(k > Int.MinValue)
       val newNewHead = insertUpwards(k, height, newHead, oneLeftmost, 1, levelZero)
-      assert(newNewHead.isSkipList)
-      assert(newNewHead.hasValue(Int.MinValue))
-      assert(isLowerOf(levelZero, newNewHead))
       lem_isInListIfInZero(k, newNewHead, levelZero)
       if(sl.maxHeight < height) {
         val x = SkipList(newNewHead, height)
-        assert(x.head.hasValue(Int.MinValue))
-        assert(nodeHeight(newNewHead) == height)
-        assert(headIsMinInt(x))
-        assert(x.isSkipList)
         x
       }
       else {
         val x = SkipList(newNewHead, sl.maxHeight)
-        assert(x.head.hasValue(Int.MinValue))
-        assert(nodeHeight(x.head) <= x.maxHeight)
-        assert(headIsMinInt(x))
-        assert(x.isSkipList)
         x
       }
       
     }
     else {
-      assert(isInTheList(k, levelZero))
       SkipList(levelZero,  max(sl.maxHeight, height))
     }
   } ensuring ( res => isInTheList(k, res) && res.isSkipList)
