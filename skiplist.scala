@@ -83,7 +83,6 @@ package object skiplist {
       //plug lower level
       val updatedCurrentLeftmost = plugLowerLevel(currentLeftmost, lowerLeftmost)
       lem_plugLowerLevelReturnsSkipList(currentLeftmost, lowerLeftmost)
-      lem_plugLowerLevelOnSameValueIsLowerOf(currentLeftmost, lowerLeftmost)
       //insert right
       if (currentLevel > desiredHeight) {
         updatedCurrentLeftmost
@@ -102,7 +101,6 @@ package object skiplist {
     else if (currentLevel <= desiredHeight) { // Insert at current level and recurse upwards
       //plug lower level
       val updatedCurrentLeftmost = plugLowerLevel(currentLeftmost, lowerLeftmost)
-      lem_plugLowerLevelOnSameValueIsLowerOf(currentLeftmost, lowerLeftmost)
 
       //insert right
       val finalCurrentLeftmost = updatedCurrentLeftmost match {
@@ -129,7 +127,6 @@ package object skiplist {
     }
     else { // plug and recurse upwards
       val updatedCurrentLeftmost = plugLowerLevel(currentLeftmost, lowerLeftmost)
-      lem_plugLowerLevelOnSameValueIsLowerOf(currentLeftmost, lowerLeftmost)
       val nextCurrentLeftmost = levelLeftmost(topLeftmost, currentLevel+1)
       lem_plugLowerLevelReturnsSkipList(currentLeftmost, lowerLeftmost)
       lem_isDownOf(topLeftmost, nextCurrentLeftmost, currentLeftmost, currentLevel)
@@ -311,4 +308,4 @@ package object skiplist {
       SkipList(levelZero,  max(sl.maxHeight, height))
     }
   } ensuring ( res => isInTheList(k, res) && res.isSkipList)
-}
+} 
