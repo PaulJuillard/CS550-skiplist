@@ -781,15 +781,12 @@ package object proofs {
           mid match {
             case mid@SkipNode(_, down2, _, _) =>
               if (mid != bot) {
-                lem_sizeDecreasesDown(top)
-                lem_sizeDecreasesDown(mid)
                 lem_isLowerOfTransitivity(down, down2, bot)
               }
             case Leaf => ()
           }
         }
         else {
-          lem_sizeDecreasesDown(top)
           lem_isLowerOfTransitivity(down, mid, bot)
         }
       case Leaf => ()
@@ -1018,10 +1015,7 @@ package object proofs {
         if (value != target) {
           right match {
             case SkipNode(valueR, _, _, _) => {
-              if (valueR == target) {
-                check(isInRightSubtree(k, findNewDown(n, target)))
-              }
-              else {
+              if (valueR != target) {
                 lem_valueStillInSubtreeAfterNewDown(right, target, k)
               }
             }
@@ -1032,71 +1026,25 @@ package object proofs {
     isInRightSubtree(k, findNewDown(n, target))
   }.holds
 
-  def lem_increaseHeightReturnsSkiplist(n: Node, newHeight: BigInt): Unit = {
+  def lem_increaseHeightReturnsValidSkiplist(n: Node, newHeight: BigInt): Boolean = {
     require(n.isSkipList)
     require(newHeight >= nodeHeight(n))
     decreases(newHeight - nodeHeight(n))
-
-    n match {
-      case n@SkipNode(value, down, right, height) => {
-        if (height >= newHeight) {
-          ()
-        } 
-        else {
-          val up = SkipNode(value, n, Leaf, height+1)
-          lem_increaseHeightReturnsSkiplist(up, newHeight)
-          ()
-        }
-      }
-      case Leaf => ()
-    }
-  } ensuring ( _ => increaseHeight(n, newHeight).isSkipList)
-
-  def lem_increaseHeightReturnsMinValueNode(n: Node, newHeight: BigInt): Unit = {
-    require(n.isSkipList)
-    require(newHeight >= nodeHeight(n))
     require(n.hasValue(Int.MinValue))
 
-    decreases(newHeight - nodeHeight(n))
-
     n match {
       case n@SkipNode(value, down, right, height) => {
-        if (height >= newHeight) {
-          ()
-        } 
-        else {
+        if (height < newHeight) {
           val up = SkipNode(value, n, Leaf, height+1)
-          lem_increaseHeightReturnsMinValueNode(up, newHeight)
-          ()
+          lem_increaseHeightReturnsValidSkiplist(up, newHeight)
         }
       }
       case Leaf => ()
     }
-  } ensuring ( _ => increaseHeight(n, newHeight).hasValue(Int.MinValue))
+    increaseHeight(n, newHeight).isSkipList && increaseHeight(n, newHeight).hasValue(Int.MinValue) && nodeHeight(increaseHeight(n, newHeight)) == newHeight
+  }.holds
   
-  def lem_increaseHeightReturnsHigherNode(n: Node, newHeight: BigInt): Unit = {
-    require(n.isSkipList)
-    require(newHeight >= nodeHeight(n))
-    require(n.hasValue(Int.MinValue))
-
-    decreases(newHeight - nodeHeight(n))
-
-    n match {
-      case n@SkipNode(value, down, right, height) => {
-        if (height >= newHeight) {
-          ()
-        } 
-        else {
-          val up = SkipNode(value, n, Leaf, height+1)
-          lem_increaseHeightReturnsHigherNode(up, newHeight)
-          ()
-        }
-      }
-      case Leaf => ()
-    }
-  } ensuring ( _ => nodeHeight(increaseHeight(n, newHeight)) == newHeight)
-  
-  def lem_insertRightZeroHeightIsSkipList(n: SkipNode, k: Int) : Unit = {
+  def lem_insertRightZeroHeightIsSkipList(n: SkipNode, k: Int) : Boolean = {
     require(n.isSkipList)
     require(n.value <= k)
     require(nodeHeight(n) == 0)
@@ -1109,17 +1057,13 @@ package object proofs {
             lem_insertRightZeroHeightIsSkipList(r, k)
           }
         }
-        case Leaf => {
-          val newRight = SkipNode(k, Leaf, Leaf, n.height)
-          val ret = SkipNode(n.value, n.down, newRight, n.height)
-          check(levelsAxiom(newRight))
-          check(levelsAxiom(ret))
-        }
+        case Leaf => ()
       }
     }
-  } ensuring ( _ => insertRightZeroHeight(n, k).isSkipList)
+    insertRightZeroHeight(n, k).isSkipList
+  }.holds
 
-  def lem_insertRightZeroHeightContainsK(n: SkipNode, k: Int) : Unit = {
+  def lem_insertRightZeroHeightContainsK(n: SkipNode, k: Int) : Boolean = {
     require(n.isSkipList)
     require(n.value < k)
     require(nodeHeight(n) == 0)
@@ -1132,9 +1076,10 @@ package object proofs {
       }
       case Leaf => ()
     }
-  } ensuring ( _ => isInRightSubtree(k,insertRightZeroHeight(n, k)))
+    isInRightSubtree(k,insertRightZeroHeight(n, k))
+  }.holds
   
-  def plugLowerLevelHasNonNegativeHeightAndIncreasesToTheRight(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Unit = {
+  def plugLowerLevelHasNonNegativeHeightAndIncreasesToTheRight(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Boolean = {
     require(oldCurrentLeftmost.isSkipList)
     require(newLowerLeftmost.isSkipList)
     require(oldCurrentLeftmost.isSkipNode)
@@ -1146,7 +1091,6 @@ package object proofs {
     (oldCurrentLeftmost, newLowerLeftmost) match {
       case (o@SkipNode(value, down, right, height), n@SkipNode(valueL, downL, rightL, heightL)) => {
         val newDown = findNewDown(n, value)
-        assert(plugLowerLevel(o,n).isSkipNode)
         assert(hasSameValueandHeight(plugLowerLevel(o,n),o))
         right match {
           case right@SkipNode(valueR, _, _, _) => plugLowerLevelHasNonNegativeHeightAndIncreasesToTheRight(right,newDown)
@@ -1154,9 +1098,10 @@ package object proofs {
         }
       }
     }
-  } ensuring (hasNonNegativeHeight(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)) && increasesToTheRight(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
+    hasNonNegativeHeight(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)) && increasesToTheRight(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost))
+  }.holds
 
-  def plugLowerLevelReturnsHeightDrecreasesDown(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Unit = {
+  def plugLowerLevelReturnsHeightDrecreasesDown(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Boolean = {
     require(oldCurrentLeftmost.isSkipList)
     require(newLowerLeftmost.isSkipList)
     require(oldCurrentLeftmost.isSkipNode)
@@ -1181,14 +1126,10 @@ package object proofs {
               lem_isInRightSubtreeImpliesSelfValueIsLower(n, value)
               lem_newDownReturnsSkipNodeOfValue(n,value)
               plugLowerLevelHasNonNegativeHeightAndIncreasesToTheRight(o,n)
-              assert(heightDecreasesDown(newDown))
               newDown match {
                 case nD@SkipNode(ndV, ndD, ndR, ndH) => {
-                  assert(ndV == value)
                   lem_newDownIsInRightSubtreeOfOld(n,value)
                   lem_inRightSubtreeHasSameNodeHeight(n, nD)
-                  assert(height == heightL+1)
-                  assert(ndH == heightL)
                 }
               }
             }
@@ -1196,9 +1137,10 @@ package object proofs {
         }
       }
     }
-  } ensuring (heightDecreasesDown(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
+    heightDecreasesDown(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost))
+  }.holds
 
-  def plugLowerLevelReturnsLevelsAxiom(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Unit = {
+  def plugLowerLevelReturnsLevelsAxiom(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Boolean = {
     require(oldCurrentLeftmost.isSkipList)
     require(newLowerLeftmost.isSkipList)
     require(oldCurrentLeftmost.isSkipNode)
@@ -1210,21 +1152,20 @@ package object proofs {
     (oldCurrentLeftmost, newLowerLeftmost) match {
       case (o@SkipNode(value, down, right, height), n@SkipNode(valueL, downL, rightL, heightL)) => {
         val newDown = findNewDown(n, value)
-        assert(plugLowerLevel(o,n).isSkipNode)
         assert(hasSameValueandHeight(plugLowerLevel(o,n),o))
         right match {
           case right@SkipNode(valueR, downR, _, _) => {
             plugLowerLevelReturnsLevelsAxiom(right,newDown)
             lem_newDownIsInRightSubtreeOfOld(newDown,valueR)
-            assert(isInRightSubtree(findNewDown(newDown, valueR), newDown))
           }
           case Leaf => lem_newDownReturnsSkipList(newLowerLeftmost, value)
         }
       }
     }
-  } ensuring (levelsAxiom(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost)))
+    levelsAxiom(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost))
+  }.holds
 
-  def lem_plugLowerLevelReturnsSkipList(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Unit = {
+  def lem_plugLowerLevelReturnsSkipList(oldCurrentLeftmost: Node, newLowerLeftmost: Node): Boolean = {
     require(oldCurrentLeftmost.isSkipList)
     require(newLowerLeftmost.isSkipList)
     require(oldCurrentLeftmost.isSkipNode)
@@ -1239,32 +1180,21 @@ package object proofs {
             plugLowerLevelHasNonNegativeHeightAndIncreasesToTheRight(o,n)
             plugLowerLevelReturnsLevelsAxiom(o,n)
             plugLowerLevelReturnsHeightDrecreasesDown(o,n)
-            assert(plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost).isSkipList)
           }
         }
       }
     }
-  } ensuring (plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost).isSkipList)
+    plugLowerLevel(oldCurrentLeftmost, newLowerLeftmost).isSkipList
+  }.holds
 
   // Lemmas about size
-  def lem_sizeSkipNodeIsPositive(t: SkipNode): Unit = {
-  } ensuring (_ => size(t) > 0)
-
-  def sizeDecreasesToTheRight(n: SkipNode): Unit = {
+  def sizeDecreasesToTheRight(n: SkipNode): Boolean = {
     require(n.isSkipList)
     lem_sizeAtRightIsLower(n, n.right)
-    n.right match {
-      case SkipNode(_, _, _, _) => assert(size(n) > size(n.right))
-      case Leaf => {
-        lem_sizeSkipNodeIsPositive(n)
-      }
-    }
-  } ensuring (_ => size(n) > size(n.right))
+    size(n) > size(n.right)
+  }.holds
 
-  def lem_sizeDecreasesDown(n: SkipNode): Unit = {
-  } ensuring (_ => size(n) > size(n.down))
-
-  def lem_sizeAtRightIsLower(n: Node, x: Node): Unit = {
+  def lem_sizeAtRightIsLower(n: Node, x: Node): Boolean = {
     require(n.isSkipList)
     require(x.isSkipList)
     require(isInRightSubtree(x, n))
@@ -1277,7 +1207,6 @@ package object proofs {
           down match {
             case (down@SkipNode(_, _, _, _)) => {
               lem_sizeAtRightIsLower(down, downR)
-              lem_sizeSkipNodeIsPositive(down)
             }
             case Leaf => ()
           }
@@ -1286,7 +1215,8 @@ package object proofs {
       }
       case Leaf => ()
     }
-  } ensuring (_ => n.isLeaf || size(n) > size(x))
+    n.isLeaf || size(n) > size(x)
+  }.holds
   
   def lem_inRightSubtreeImpliesLowerMeasure(n: Node, x: Node): Boolean = {
     require(isInRightSubtree(x, n))
@@ -1358,7 +1288,6 @@ package object proofs {
         right.down match {
           case rD@SkipNode(_, _, _, _) => {
             lem_isInTheListImpliesInTheListOfDown(target,of)
-            lem_sizeDecreasesDown(of)
             lem_isInTheListImpliesHigher(target,d,rD)
           }
         }
@@ -1384,8 +1313,6 @@ package object proofs {
         assert(right.down.isSkipNode)
         right.down match {
           case rD@SkipNode(_, _, _, _) => {
-            // lem_elementOfSkipListIsSkipList(of)
-            lem_sizeDecreasesDown(of)
             lem_notInTheListImpliesNotInRightsList(target,d,rD)
             lem_notInRightSubtreeImpliesNotInRightsRightSubtree(target,of,right)
           }
@@ -1521,7 +1448,6 @@ package object proofs {
               r match {
                 case r@SkipNode(_,_,_,_) => {
                   lem_isInRightSubtreeTransitive(n, r, v)
-                  lem_sizeSkipNodeIsPositive(r)
                 }
               }
               sizeDecreasesToTheRight(n)

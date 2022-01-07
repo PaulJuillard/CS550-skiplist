@@ -266,9 +266,7 @@ package object skiplist {
     
     // if needed, bring first value to same height
     val newHead = if (height > nodeHeight(sl.head)) {
-                    lem_increaseHeightReturnsSkiplist(sl.head, height)
-                    lem_increaseHeightReturnsMinValueNode(sl.head, height)
-                    lem_increaseHeightReturnsHigherNode(sl.head, height)
+                    lem_increaseHeightReturnsValidSkiplist(sl.head, height)
                     increaseHeight(sl.head, height)
                   } else {
                     check(height <= nodeHeight(sl.head))
