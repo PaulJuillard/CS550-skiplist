@@ -8,7 +8,6 @@ import stainless.math.{max, min, wrapping}
 import stainless.lang._
 import stainless.annotation._
 import stainless.collection._
-import stainless.proof.check
 
 package object skiplist {
   sealed abstract class Node {
@@ -187,7 +186,7 @@ package object skiplist {
           r match {
             case r@SkipNode(valueR, downR, rightR, heightR) => {
               if (valueR <= k) {
-                sizeDecreasesToTheRight(n)
+                lem_sizeDecreasesToTheRight(n)
                 higherLevelIsSubsetofLowerOne(n, r)
                 if (valueR == k) {
                   n
@@ -225,7 +224,7 @@ package object skiplist {
       n.right match {
         case r@SkipNode(valueR, downR, rightR, heightR) => {
           if (valueR <= k) {
-            sizeDecreasesToTheRight(n)
+            lem_sizeDecreasesToTheRight(n)
             val newRight = insertRightZeroHeight(r, k)
             SkipNode(n.value, n.down, newRight, n.height)
           }
@@ -269,7 +268,6 @@ package object skiplist {
                     lem_increaseHeightReturnsValidSkiplist(sl.head, height)
                     increaseHeight(sl.head, height)
                   } else {
-                    check(height <= nodeHeight(sl.head))
                     sl.head
                   }
 

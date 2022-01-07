@@ -6,7 +6,6 @@ import stainless.math.{max, min, wrapping}
 import stainless.lang._
 import stainless.annotation._
 import stainless.collection._
-import stainless.proof.check
 
 package object axioms {
   // True if the head has value Int.MinValue and has a height smaller than sl.maxHeight

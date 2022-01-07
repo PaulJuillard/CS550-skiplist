@@ -7,7 +7,6 @@ import stainless.math.{max, min, wrapping}
 import stainless.lang._
 import stainless.annotation._
 import stainless.collection._
-import stainless.proof.check
 
 package object properties {
   // Def - Element is in the list if it is in the right subtree of first element, or in the list of element just below
@@ -22,7 +21,7 @@ package object properties {
   // 8 - If sl is a skiplist and a is not in sl, search(sl, a) returns None
   
   // 0
-  def higherLevelIsSubsetofLowerOne(n: SkipNode, x: SkipNode): Unit = {
+  def higherLevelIsSubsetofLowerOne(n: SkipNode, x: SkipNode): Boolean = {
     require(n.isSkipList)
     require(x.isSkipList)
     require(isInRightSubtree(x, n))
@@ -37,12 +36,12 @@ package object properties {
         }
       }
     }
-  } ensuring (_ => (n.down.isLeaf && x.down.isLeaf) || isInRightSubtree(x.down, n.down))
+    (n.down.isLeaf && x.down.isLeaf) || isInRightSubtree(x.down, n.down)
+  }.holds
 
-  def higherLevelIsSubsetofLowerOne(v: Int, n: SkipNode): Unit = {
+  def higherLevelIsSubsetofLowerOne(v: Int, n: SkipNode): Boolean = {
     require(n.isSkipList)
     require(isInRightSubtree(v, n))
-    assert(n.right.isSkipNode)
     n.right match {
       case r@SkipNode(valueR, downR, _, _) => {
         if (v != valueR) {
@@ -62,13 +61,15 @@ package object properties {
         }
       }
     }
-  } ensuring (_ => n.down.isLeaf || isInRightSubtree(v, n.down))
+    n.down.isLeaf || isInRightSubtree(v, n.down)
+  }.holds
 
   // 1
-  def insertReturnsSkiplist(sl : SkipList, v: Int, height:BigInt): Unit = {
+  def insertReturnsSkiplist(sl : SkipList, v: Int, height:BigInt): Boolean = {
     require(sl.isSkipList)
     require(height>=0)
-  } ensuring (_ => insert(sl,v,height).isSkipList)
+    insert(sl,v,height).isSkipList
+  }.holds
   
   // 3
   def insertReallyInserts(sl: SkipList, v:Int, height:BigInt): Boolean = {
@@ -79,13 +80,14 @@ package object properties {
   }.holds
 
   // 7
-  def searchFindsElement(sl: SkipList, v: Int): Unit = {
+  def searchFindsElement(sl: SkipList, v: Int): Boolean = {
     require(sl.isSkipList)
     require(isInTheList(v,sl))
     searchFindsElement(sl.head,v)
-  } ensuring (_ => search(sl,v) == Some(v))
+    search(sl,v) == Some(v)
+  }.holds
 
-  def searchFindsElement(n: Node, v:Int): Unit = {
+  def searchFindsElement(n: Node, v:Int): Boolean = {
     require(n.isSkipList)
     require(isInTheList(v,n)) 
     decreases(size(n))
@@ -97,11 +99,10 @@ package object properties {
             case r@SkipNode(vR,_,_,_) => {
               if (vR <= v){
                 lem_isInTheListLargerThanNodeImpliesInRightsList(v,n)
-                sizeDecreasesToTheRight(n)
+                lem_sizeDecreasesToTheRight(n)
                 searchFindsElement(r,v)
               } else {
                 lem_isInRightSubtreeImpliesValueHigher(v,r)
-                lem_isInTheListButNotInRightsImpliesDownIsASkipnode(v,n)
                 down match {
                   case d@SkipNode(vD, _, _, _) => {
                     lem_isInTheListImpliesInTheListOfDown(v,n)
@@ -123,17 +124,19 @@ package object properties {
         }
       }
     }
-  } ensuring (_ => search_(n,v) == Some(v))
+    search_(n,v) == Some(v)
+  }.holds
 
   // 8
-  def searchFindsNone(sl: SkipList, v: Int): Unit = {
+  def searchFindsNone(sl: SkipList, v: Int): Boolean = {
     require(sl.isSkipList)
     require(!isInTheList(v,sl))
     searchFindsNone(sl.head,v)
-  } ensuring (_ => search(sl,v) == None())
+    search(sl,v) == None()
+  }.holds
   
 
-  def searchFindsNone(n: Node, v: Int): Unit = {
+  def searchFindsNone(n: Node, v: Int): Boolean = {
     require(n.isSkipList)
     require(!isInTheList(v,n))
     decreases(size(n))
@@ -143,7 +146,7 @@ package object properties {
         r match {
           case r@SkipNode(vR,_,_,_) => 
             if (vR <= v) { 
-                sizeDecreasesToTheRight(n)
+                lem_sizeDecreasesToTheRight(n)
                 lem_notInTheListImpliesNotInRightsList(v,n,r)
                 searchFindsNone(r, v)
               }
@@ -157,5 +160,6 @@ package object properties {
         }
       }
     }
-  } ensuring (_ => search_(n,v) == None())
+    search_(n,v) == None()
+  }.holds
 }

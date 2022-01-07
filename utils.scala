@@ -5,7 +5,6 @@ import stainless.math.{max, min, wrapping}
 import stainless.lang._
 import stainless.annotation._
 import stainless.collection._
-import stainless.proof.check
 
 package object utils {
   // True if right is n's right node
@@ -220,12 +219,10 @@ package object utils {
     decreases(nodeHeight(n) - level)
     val res: Node = n match {
       case sn@SkipNode(value,down,_,height) =>
-        assert(height >= level)
         if (height > level) {
           levelLeftmost(down, level)
         }
         else {
-          assert(height == level)
           sn
         }
     }
